@@ -1,0 +1,20 @@
+Changelog
+offline
+online
+sexualized
+wiki
+pawabot
+A bot for many things: aria2 management, torrent sites crawling, media organization with filebot and plex.
+Timothée Mazzucotelli
+pawamoy@pm.me
+pawamoy
+github.com
+pawamoy
+pawabot
+Timothée Mazzucotelli
+pawamoy@pm.me
+2019
+ISC License
+pawabot
+pawabot
+pawabot
