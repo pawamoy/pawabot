@@ -11,7 +11,7 @@ license = "ISC License"
 readme = "README.md"
 repository = "https://github.com/pawamoy/pawabot"
 homepage = "https://github.com/pawamoy/pawabot"
-keywords = []
+keywords = ["telegram-bot", "aria2"]
 packages = [ { include = "pawabot", from = "src" } ]
 include = [
     "README.md",
@@ -26,6 +26,7 @@ aria2p = "^0.2.5"
 ThePirateBay = "^1.3"
 beautifulsoup4 = "^4.8"
 requests = "^2.22"
+tomlkit = "^0.5.5"
 
 [tool.poetry.dev-dependencies]
 bandit = "^1.5"

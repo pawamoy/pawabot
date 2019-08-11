@@ -63,15 +63,20 @@ def main(args=None):
     )
 
     dispatcher.add_handler(handler_search)
-    # dispatcher.add_handler(handler_search_no_args)
 
     dispatcher.add_handler(InlineQueryHandler(callbacks.inline_search))
 
     dispatcher.add_handler(MessageHandler(Filters.regex(callbacks.MAGNET_RE), callbacks.parse_magnet))
+
+    dispatcher.add_handler(CommandHandler("test", callbacks.test))
+
     dispatcher.add_handler(MessageHandler(Filters.command, callbacks.unknown_command))
     dispatcher.add_handler(MessageHandler(Filters.text, callbacks.unknown))
 
+    logging.info("Starting Bot")
     updater.start_polling()
+
+    logging.info("Putting Bot in idle mode")
     updater.idle()
 
     return 0

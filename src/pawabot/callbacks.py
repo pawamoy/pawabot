@@ -27,7 +27,7 @@ class STATE:
 def start(update, context):
     tg_user = update.effective_user
     db_user = get_user(tg_user.id)
-    logging.info(f"{tg_user.username} ({tg_user.id}) called start")
+    logging.info(f"{tg_user.username} ({tg_user.id}) called /start")
 
     if not db_user:
         text = dedent(
@@ -42,12 +42,12 @@ def start(update, context):
         text = dedent(
             f"""
             Nice to meet you, {tg_user.username}!
-    
+
             I'm some kind of an assistant bot. I'll help you search and find
             torrents, select them for download and re-organize the downloaded
             files with filebot! I'll ask for confirmations and stuff, I hope
             you don't mind me sending you a few messages sometimes!
-    
+
             Type the command /help to learn how to use my commands!
             """
         )
@@ -58,7 +58,7 @@ def start(update, context):
 @restricted_command(["can_request_help"])
 def help(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called help")
+    logging.info(f"{user.username} ({user.id}) called /help")
     text = dedent(
         """
         /start - To get an introduction.
@@ -78,14 +78,14 @@ def help(update, context):
 @restricted_command([])
 def my_id(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called myID")
+    logging.info(f"{user.username} ({user.id}) called /myID")
     context.bot.send_message(chat_id=update.message.chat_id, text=update.effective_user.id)
 
 
 @restricted_command([])
 def my_permissions(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called myPermissions")
+    logging.info(f"{user.username} ({user.id}) called /myPermissions")
     db_user = get_user(user.id)
 
     text = []
@@ -106,7 +106,7 @@ def my_permissions(update, context):
 @restricted_command(["can_search"])
 def search(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called search with {context.args}")
+    logging.info(f"{user.username} ({user.id}) called /search with args={context.args}")
 
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -114,48 +114,79 @@ def search(update, context):
         context.bot.send_message(chat_id=update.message.chat_id, text="What do you want to search?")
         return STATE.SEARCH.PATTERN
 
-    torrents = get_torrents(" ".join(context.args))
+    pattern = " ".join(context.args)
+    torrents = get_torrents(pattern)
 
     if not torrents:
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
         return
 
-    update_saved_torrents(torrents, update.effective_user.id)
+    save_torrents(pattern, torrents, update.effective_user.id)
     reply_torrents(update, context, torrents)
 
     return STATE.SEARCH.SELECT
 
 
 def search_pattern(update, context):
-    torrents = get_torrents(update.message.text)
+    user = update.effective_user
+    pattern = update.message.text
+    logging.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
+    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+
+    torrents = get_torrents(pattern)
 
     if not torrents:
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
         return ConversationHandler.END
 
-    update_saved_torrents(torrents, update.effective_user.id)
+    save_torrents(pattern, torrents, user.id)
     reply_torrents(update, context, torrents)
 
     return STATE.SEARCH.SELECT
 
 
 def search_select(update, context):
+    user = update.effective_user
+
     if update.message.text == "Cancel":
+        logging.info(f"{user.username} ({user.id}) canceled /search conversation")
         return ConversationHandler.END
 
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
-    torrents = load_torrents(update.effective_user.id)
+    pattern, torrents = load_torrents(update.effective_user.id)
 
     if update.message.text.endswith("+"):
-        page = int(update.message.text[:-1]) // 10
+        next = int(update.message.text[:-1])
+
+        if next >= len(torrents):
+            torrents = update_saved_torrents(pattern, get_torrents(pattern, page=next // 30), user.id)
+
+        page = next // 10
+        logging.info(f"{user.username} ({user.id}) asked to see page {page+1} during /search conversation")
         reply_torrents(update, context, torrents, page=page + 1)
         return STATE.SEARCH.SELECT
 
     choice = int(update.message.text)
     torrent = torrents[choice - 1]
+    logging.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
 
-    context.bot.send_message(chat_id=update.message.chat_id, text=f"You chose torrent {torrent.title}")
+    db_user = get_user(user.id)
+    if db_user.is_owner or db_user.has_perm("can_auto_download"):
+        api = aria2p.API()
+        download = api.add_magnet(torrent.magnet)
+        reply = f"The new download is *{download.name}* (gid: {download.gid}, status: {download.status})"
+        logging.info(f"torrent '{download.name}' (gid: {download.gid}) was added to aria2")
+    else:
+        reply = f"A download request has been sent to an administrator. " \
+            f"You will get a notification when they processed it."
+
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=reply,
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode=ParseMode.MARKDOWN
+    )
 
     return ConversationHandler.END
 
@@ -170,16 +201,25 @@ def reply_torrents(update, context, torrents, page=1):
     for i, torrent in enumerate(torrents[x:y], 1):
         keyboard_buttons[0 if i <= 5 else 1].append(str(i + x))
         reply_text.append(
-            f"*#{i} - {torrent.title}*\n" f"  {torrent.seeders}/{torrent.leechers}  {torrent.size}  {torrent.date}\n\n"
+            f"*#{i+x} - {torrent.title}*\n"
+            f"  {torrent.seeders}/{torrent.leechers}  {torrent.size}  {torrent.date}\n\n"
         )
 
-    keyboard_buttons.append([str(int(keyboard_buttons[1][-1])) + "+", "Cancel"])
+    third_row = ["Cancel"]
+    if keyboard_buttons[1]:
+        last = keyboard_buttons[1][-1]
+    else:
+        last = keyboard_buttons[0][-1]
+    if len(torrents) > y or len(torrents) % 30 == 0:
+        third_row.insert(0, last + "+")
+
+    keyboard_buttons.append(third_row)
 
     context.bot.send_message(
         chat_id=update.message.chat_id,
         text="".join(reply_text),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=ReplyKeyboardMarkup(keyboard_buttons, one_time_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(keyboard_buttons, one_time_keyboard=True, resize_keyboard=True),
     )
 
 
@@ -245,8 +285,8 @@ def parse_magnet(update, context):
     tg_user = update.effective_user
     db_user = get_user(tg_user.id)
 
-    user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) sent magnet(s)")
+    logging.info(f"{tg_user.username} ({tg_user.id}) sent magnet(s)")
+
     magnets = re.findall(MAGNET_RE, update.message.text)
 
     if len(magnets) == 1:
@@ -274,6 +314,8 @@ def parse_magnet(update, context):
 @restricted_command([])
 def request_access(update, context):
     tg_user = update.effective_user
+    logging.info(f"{tg_user.username} ({tg_user.id}) called /requestAccess")
+
     user = get_user(tg_user.id)
 
     if not user:
@@ -289,6 +331,9 @@ def request_access(update, context):
 
 @restricted_command(["can_grant_permissions"])
 def grant(update, context):
+    tg_user = update.effective_user
+    logging.info(f"{tg_user.username} ({tg_user.id}) called /grant")
+
     if (not context.args) or len(context.args) != 2:
         context.bot.send_message(chat_id=update.message.chat_id, text="Usage is /grant <ID_OR_USERNAME> <PERMISSION>")
         return
@@ -381,6 +426,15 @@ def cancel(update, context):
     update.message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
 
 
+@restricted_command(["can_test"])
+def test(update, context):
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text="testing",
+        reply_markup=ReplyKeyboardMarkup([[str(i)] for i in range(20)], one_time_keyboard=True),
+    )
+
+
 @restricted_command([])
 def unknown_command(update, context):
     user = update.message.from_user
@@ -393,7 +447,7 @@ def unknown_command(update, context):
 @restricted_command([])
 def unknown(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) type unknown text: {update.message.text}")
+    logging.info(f"{user.username} ({user.id}) typed unknown text: {update.message.text}")
     text = random.choice(
         [
             "yo",

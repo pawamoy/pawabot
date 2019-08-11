@@ -56,7 +56,7 @@ def deny_access(update, context, func_name):
 Torrent = namedtuple("Torrent", "title magnet url seeders leechers date size uploader")
 
 
-def get_torrents(pattern, proxy=None):
+def get_torrents(pattern, page=None, proxy=None):
     # https://pirateproxy.ch
     # https://tpb6.ukpass.co
     # https://tpbprox.com
@@ -75,8 +75,13 @@ def get_torrents(pattern, proxy=None):
     if not proxy:
         proxy = "https://pirateproxy.ch"
 
+    if isinstance(page, int):
+        page = "&page=" + str(page)
+    else:
+        page = ""
+
     soup = BeautifulSoup(requests.get(proxy).text, features="lxml")
-    search_url = f"{proxy.rstrip('/')}/{soup.form['action'].lstrip('/')}?q={pattern}"
+    search_url = f"{proxy.rstrip('/')}/{soup.form['action'].lstrip('/')}?q={pattern}{page}"
     print(search_url)
     soup = BeautifulSoup(requests.get(search_url).text, features="lxml")
 
@@ -104,20 +109,22 @@ def get_torrents(pattern, proxy=None):
     return torrents
 
 
-def save_torrents(torrents, uid):
+def save_torrents(pattern, torrents, uid):
     with open(f"torrent-search-{uid}.json", "w") as fp:
-        json.dump(torrents, fp, indent=2)
+        json.dump({"pattern": pattern, "torrents": torrents}, fp, indent=2)
 
 
-def update_saved_torrents(new_torrents, uid):
+def update_saved_torrents(pattern, new_torrents, uid):
     try:
-        current_torrents = load_torrents(uid)
+        pattern, current_torrents = load_torrents(uid)
     except FileNotFoundError:
         current_torrents = []
     current_torrents.extend(new_torrents)
-    save_torrents(new_torrents, uid)
+    save_torrents(pattern, current_torrents, uid)
+    return current_torrents
 
 
 def load_torrents(uid):
     with open(f"torrent-search-{uid}.json", "r") as fp:
-        return [Torrent(*item) for item in json.load(fp)]
+        data = json.load(fp)
+        return data["pattern"], [Torrent(*item) for item in data["torrents"]]
