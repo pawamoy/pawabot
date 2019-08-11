@@ -1,57 +1,9 @@
 import json
-import logging
 import re
 from collections import namedtuple
-from functools import wraps
-from pathlib import Path
-from tempfile import mktemp
 
 import requests
 from bs4 import BeautifulSoup
-
-from .database import Permission, User, session
-
-
-def restricted_command(permissions):
-    def decorator(func):
-        @wraps(func)
-        def wrapped(update, context, *args, **kwargs):
-            user_id = update.effective_user.id
-            db_user = session.query(User).filter(User.uid == user_id).first()
-
-            if not db_user:
-                deny_access(update, context)
-                return
-
-            if db_user.username != update.effective_user.username:
-                db_user.username = update.effective_user.username
-                session.commit()
-
-            if not db_user.is_owner:
-                db_user_perms = session.query(Permission.permission).filter(Permission.user_id == user_id)
-
-                if not set(permissions).issubset(set(db_user_perms)):
-                    deny_access(update, context, func.__name__)
-                    return
-
-            return func(update, context, *args, **kwargs)
-
-        return wrapped
-
-    return decorator
-
-
-def deny_access(update, context, func_name):
-    logging.warning(
-        f"Unauthorized access denied for {update.effective_user.username} ({update.effective_user.id}) "
-        f"on function {func_name}"
-    )
-    context.bot.send_message(
-        chat_id=update.message.chat_id,
-        text="Sorry, you don't have the required permissions to do that."
-        "Try to contact the administrator of this bot.",
-    )
-
 
 Torrent = namedtuple("Torrent", "title magnet url seeders leechers date size uploader")
 

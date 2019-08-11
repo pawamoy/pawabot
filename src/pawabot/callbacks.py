@@ -1,22 +1,21 @@
 import logging
 import random
 import re
-import subprocess
 from textwrap import dedent
 
 import aria2p
-from telegram import (
+from privibot import User, require_access, require_privileges
+from telegram.ext import ConversationHandler
+
+from .privileges import Privileges
+from .utils import get_torrents, load_torrents, save_torrents, update_saved_torrents
+
+from telegram import (  # InlineQueryResultArticle,; InputTextMessageContent,
     ChatAction,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
     ParseMode,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
-from telegram.ext import ConversationHandler
-
-from .database import create_user, get_user
-from .utils import get_torrents, load_torrents, restricted_command, save_torrents, update_saved_torrents
 
 
 class STATE:
@@ -26,8 +25,9 @@ class STATE:
 
 def start(update, context):
     tg_user = update.effective_user
-    db_user = get_user(tg_user.id)
     logging.info(f"{tg_user.username} ({tg_user.id}) called /start")
+
+    db_user = User.get_with_id(tg_user.id)
 
     if not db_user:
         text = dedent(
@@ -55,7 +55,7 @@ def start(update, context):
     context.bot.send_message(chat_id=update.message.chat_id, text=text)
 
 
-@restricted_command(["can_request_help"])
+@require_access
 def help(update, context):
     user = update.message.from_user
     logging.info(f"{user.username} ({user.id}) called /help")
@@ -75,35 +75,14 @@ def help(update, context):
     context.bot.send_message(chat_id=update.message.chat_id, text=text, parse_mode=ParseMode.MARKDOWN)
 
 
-@restricted_command([])
+@require_access
 def my_id(update, context):
     user = update.message.from_user
     logging.info(f"{user.username} ({user.id}) called /myID")
     context.bot.send_message(chat_id=update.message.chat_id, text=update.effective_user.id)
 
 
-@restricted_command([])
-def my_permissions(update, context):
-    user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called /myPermissions")
-    db_user = get_user(user.id)
-
-    text = []
-    if db_user:
-        if db_user.is_owner:
-            text.append("You are an administrator: you have full access to all commands.\n")
-        permissions = list(db_user.permissions) if db_user else []
-        if permissions:
-            text.append("\n" + "\n".join(permissions))
-        else:
-            text.append("You have zero permissions.")
-    else:
-        text.append("You do not have access to my commands.")
-
-    context.bot.send_message(chat_id=update.message.chat_id, text="".join(text))
-
-
-@restricted_command(["can_search"])
+@require_privileges([Privileges.DOWNLOADER])
 def search(update, context):
     user = update.message.from_user
     logging.info(f"{user.username} ({user.id}) called /search with args={context.args}")
@@ -119,9 +98,9 @@ def search(update, context):
 
     if not torrents:
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
-        return
+        return ConversationHandler.END
 
-    save_torrents(pattern, torrents, update.effective_user.id)
+    save_torrents(pattern, torrents, user.id)
     reply_torrents(update, context, torrents)
 
     return STATE.SEARCH.SELECT
@@ -171,21 +150,20 @@ def search_select(update, context):
     torrent = torrents[choice - 1]
     logging.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
 
-    db_user = get_user(user.id)
+    db_user = User.get_with_id(user.id)
     if db_user.is_owner or db_user.has_perm("can_auto_download"):
         api = aria2p.API()
         download = api.add_magnet(torrent.magnet)
         reply = f"The new download is *{download.name}* (gid: {download.gid}, status: {download.status})"
         logging.info(f"torrent '{download.name}' (gid: {download.gid}) was added to aria2")
     else:
-        reply = f"A download request has been sent to an administrator. " \
+        reply = (
+            f"A download request has been sent to an administrator. "
             f"You will get a notification when they processed it."
+        )
 
     context.bot.send_message(
-        chat_id=update.message.chat_id,
-        text=reply,
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode=ParseMode.MARKDOWN
+        chat_id=update.message.chat_id, text=reply, reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.MARKDOWN
     )
 
     return ConversationHandler.END
@@ -223,69 +201,69 @@ def reply_torrents(update, context, torrents, page=1):
     )
 
 
-@restricted_command(["can_search_inline"])
-def inline_search(update, context):
-    query = update.inline_query.query
-    user = update.inline_query.from_user
-    logging.info(f"{user.username} ({user.id}) called inline search with {query}")
-
-    if not query:
-        logging.info("inline search: query is empty, aborting")
-        return
-
-    output = None
-    retries = 2
-
-    while not output and retries > 0:
-        logging.info(f"running pirate-bay-search")
-        try:
-            output = (
-                subprocess.check_output(["pirate-bay-search", query], timeout=5).decode(encoding="utf-8").rstrip("\n")
-            )
-        except subprocess.TimeoutExpired:
-            retries -= 1
-            logging.warn(f"pirate-bay-search timeout, retries left: {retries}")
-
-    if retries == 0:
-        context.bot.answer_inline_query(
-            update.inline_query.id,
-            [
-                InlineQueryResultArticle(
-                    id=query,
-                    title="Connection timeout",
-                    input_message_content=InputTextMessageContent("Connection timeout"),
-                )
-            ],
-        )
-        return
-
-    logging.debug("pirate-bay-search results:\n\n" + output)
-
-    results = []
-    for i, torrent in enumerate(output.split("\n\n")):
-        lines = torrent.split("\n")
-        results.append(
-            InlineQueryResultArticle(
-                id=query + str(i),
-                title=lines[0].replace(".", " "),
-                description=lines[1],
-                input_message_content=InputTextMessageContent(torrent),
-                hide_url=True,
-            )
-        )
-
-    context.bot.answer_inline_query(update.inline_query.id, results)
+# @require_privileges([Privileges.DOWNLOADER])
+# def inline_search(update, context):
+#     query = update.inline_query.query
+#     user = update.inline_query.from_user
+#     logging.info(f"{user.username} ({user.id}) called inline search with {query}")
+#
+#     if not query:
+#         logging.info("inline search: query is empty, aborting")
+#         return
+#
+#     output = None
+#     retries = 2
+#
+#     while not output and retries > 0:
+#         logging.info(f"running pirate-bay-search")
+#         try:
+#             output = (
+#                 subprocess.check_output(["pirate-bay-search", query], timeout=5).decode(encoding="utf-8").rstrip("\n")
+#             )
+#         except subprocess.TimeoutExpired:
+#             retries -= 1
+#             logging.warn(f"pirate-bay-search timeout, retries left: {retries}")
+#
+#     if retries == 0:
+#         context.bot.answer_inline_query(
+#             update.inline_query.id,
+#             [
+#                 InlineQueryResultArticle(
+#                     id=query,
+#                     title="Connection timeout",
+#                     input_message_content=InputTextMessageContent("Connection timeout"),
+#                 )
+#             ],
+#         )
+#         return
+#
+#     logging.debug("pirate-bay-search results:\n\n" + output)
+#
+#     results = []
+#     for i, torrent in enumerate(output.split("\n\n")):
+#         lines = torrent.split("\n")
+#         results.append(
+#             InlineQueryResultArticle(
+#                 id=query + str(i),
+#                 title=lines[0].replace(".", " "),
+#                 description=lines[1],
+#                 input_message_content=InputTextMessageContent(torrent),
+#                 hide_url=True,
+#             )
+#         )
+#
+#     context.bot.answer_inline_query(update.inline_query.id, results)
 
 
 MAGNET_RE = r"\bmagnet:\?xt=urn:[A-Za-z0-9]+:[A-Za-z0-9]{32,40}(?:&(?:amp;)?dn=.+)?(?:&(?:amp;)?tr=.+)+\b"
 
 
-@restricted_command(["can_request_download"])
+@require_privileges([Privileges.DOWNLOADER])
 def parse_magnet(update, context):
     tg_user = update.effective_user
-    db_user = get_user(tg_user.id)
-
     logging.info(f"{tg_user.username} ({tg_user.id}) sent magnet(s)")
+
+    db_user = User.get_with_id(tg_user.id)
 
     magnets = re.findall(MAGNET_RE, update.message.text)
 
@@ -311,122 +289,13 @@ def parse_magnet(update, context):
     context.bot.send_message(chat_id=update.message.chat_id, text=reply, parse_mode=ParseMode.MARKDOWN)
 
 
-@restricted_command([])
-def request_access(update, context):
-    tg_user = update.effective_user
-    logging.info(f"{tg_user.username} ({tg_user.id}) called /requestAccess")
-
-    user = get_user(tg_user.id)
-
-    if not user:
-        create_user(tg_user.id, tg_user.username)
-        context.bot.send_message(
-            chat_id=update.message.chat_id, text="I received your request. Please wait for feedback."
-        )
-    else:
-        context.bot.send_message(
-            chat_id=update.message.chat_id, text=f"I already know you {tg_user.username}! No need to request access!"
-        )
-
-
-@restricted_command(["can_grant_permissions"])
-def grant(update, context):
-    tg_user = update.effective_user
-    logging.info(f"{tg_user.username} ({tg_user.id}) called /grant")
-
-    if (not context.args) or len(context.args) != 2:
-        context.bot.send_message(chat_id=update.message.chat_id, text="Usage is /grant <ID_OR_USERNAME> <PERMISSION>")
-        return
-
-    permission = context.args[1]
-    user = get_user(context.args[0])
-
-    if not user:
-        try:
-            uid = int(context.args[0])
-        except ValueError:
-            context.bot.send_message(
-                chat_id=update.message.chat_id,
-                text="I don't know that user, please ask them to send '/requestAccess' to me.",
-            )
-            return
-        else:
-            user = create_user(uid)
-
-    if user.has_perm(permission):
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"User {user.username} ({user.uid}) already has permission '{permission}'.",
-        )
-        return
-
-    user.grant(permission)
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"Done! User {user.username} ({user.uid}) now has permission '{permission}'.",
-    )
-
-    if update.effective_user.id != user.uid:
-        context.bot.send_message(
-            chat_id=user.uid,
-            text=f"Hi! You've been granted the permission '{permission}' "
-            f"just now by {update.effective_user.username} on "
-            f"the bot called '{context.bot.username}'. "
-            f"If you don't know what this means, just ignore this message!",
-        )
-
-
-@restricted_command(["can_revoke_permissions"])
-def revoke(update, context):
-    if not context.args or len(context.args) != 2:
-        context.bot.send_message(chat_id=update.message.chat_id, text="Usage is /revoke <ID_OR_USERNAME> <PERMISSION>")
-        return
-
-    permission = context.args[1]
-    user = get_user(context.args[0])
-
-    if not user:
-        try:
-            uid = int(context.args[0])
-        except ValueError:
-            context.bot.send_message(
-                chat_id=update.message.chat_id,
-                text="I don't know that user, please ask them to send '/requestAccess' to me.",
-            )
-            return
-        else:
-            user = create_user(uid)
-
-    if not user.has_perm(permission):
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"User {user.username} ({user.uid}) does not have permission '{permission}'.",
-        )
-        return
-
-    user.revoke(permission)
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"Done! User {user.username} ({user.uid}) just lost permission '{permission}'.",
-    )
-
-    if update.effective_user.id != user.uid:
-        context.bot.send_message(
-            chat_id=user.uid,
-            text=f"Hi! You've been revoked the permission '{permission}' "
-            f"just now by {update.effective_user.username} on "
-            f"the bot called '{context.bot.username}'. "
-            f"If you don't know what this means, just ignore this message!",
-        )
-
-
 def cancel(update, context):
     user = update.message.from_user
     logging.info("User %s canceled the conversation.", user.first_name)
     update.message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
 
 
-@restricted_command(["can_test"])
+@require_privileges([Privileges.TESTER])
 def test(update, context):
     context.bot.send_message(
         chat_id=update.message.chat_id,
@@ -435,7 +304,7 @@ def test(update, context):
     )
 
 
-@restricted_command([])
+@require_access
 def unknown_command(update, context):
     user = update.message.from_user
     logging.info(f"{user.username} ({user.id}) typed unknown command: {update.message.text}")
@@ -444,11 +313,11 @@ def unknown_command(update, context):
     )
 
 
-@restricted_command([])
+@require_access
 def unknown(update, context):
     user = update.message.from_user
     logging.info(f"{user.username} ({user.id}) typed unknown text: {update.message.text}")
-    text = random.choice(
+    text = random.choice(  # nosec
         [
             "yo",
             "wassup",

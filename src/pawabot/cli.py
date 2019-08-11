@@ -18,7 +18,8 @@ Also see http://click.pocoo.org/5/setuptools/#setuptools-integration.
 import argparse
 import logging
 
-from telegram.ext import CommandHandler, ConversationHandler, Filters, InlineQueryHandler, MessageHandler, Updater
+from privibot import callbacks as privcallbacks
+from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
 from . import callbacks
 
@@ -42,10 +43,10 @@ def main(args=None):
     dispatcher.add_handler(CommandHandler("start", callbacks.start))
     dispatcher.add_handler(CommandHandler("help", callbacks.help))
     dispatcher.add_handler(CommandHandler("myID", callbacks.my_id))
-    dispatcher.add_handler(CommandHandler("myPermissions", callbacks.my_permissions))
-    dispatcher.add_handler(CommandHandler("requestAccess", callbacks.request_access))
-    dispatcher.add_handler(CommandHandler("grant", callbacks.grant, pass_args=True))
-    dispatcher.add_handler(CommandHandler("revoke", callbacks.revoke, pass_args=True))
+    dispatcher.add_handler(CommandHandler("myPrivileges", privcallbacks.my_privileges))
+    dispatcher.add_handler(CommandHandler("requestAccess", privcallbacks.request_access))
+    dispatcher.add_handler(CommandHandler("grant", privcallbacks.grant, pass_args=True))
+    dispatcher.add_handler(CommandHandler("revoke", privcallbacks.revoke, pass_args=True))
 
     handler_search = CommandHandler("search", callbacks.search, pass_args=True)
     handler_search_pattern = MessageHandler(Filters.text, callbacks.search_pattern)
@@ -64,7 +65,7 @@ def main(args=None):
 
     dispatcher.add_handler(handler_search)
 
-    dispatcher.add_handler(InlineQueryHandler(callbacks.inline_search))
+    # dispatcher.add_handler(InlineQueryHandler(callbacks.inline_search))
 
     dispatcher.add_handler(MessageHandler(Filters.regex(callbacks.MAGNET_RE), callbacks.parse_magnet))
 

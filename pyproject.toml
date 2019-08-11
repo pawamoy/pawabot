@@ -27,7 +27,7 @@ ThePirateBay = "^1.3"
 beautifulsoup4 = "^4.8"
 requests = "^2.22"
 tomlkit = "^0.5.5"
-
+privibot = {git = "/home/pawamoy/Data/dev/pawamoy/privibot"}
 [tool.poetry.dev-dependencies]
 bandit = "^1.5"
 black = { version = "*", allows-prereleases = true }
