@@ -5,17 +5,16 @@ from textwrap import dedent
 
 import aria2p
 from privibot import User, require_access, require_privileges
-from telegram.ext import ConversationHandler
-
-from .privileges import Privileges
-from .utils import get_torrents, load_torrents, save_torrents, update_saved_torrents
-
-from telegram import (  # InlineQueryResultArticle,; InputTextMessageContent,
+from telegram import (  # InlineQueryResultArticle, InputTextMessageContent,
     ChatAction,
     ParseMode,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
+from telegram.ext import ConversationHandler
+
+from .privileges import Privileges
+from .torrents import TPB, Search
 
 
 class STATE:
@@ -94,14 +93,14 @@ def search(update, context):
         return STATE.SEARCH.PATTERN
 
     pattern = " ".join(context.args)
-    torrents = get_torrents(pattern)
+    s = TPB.search(pattern)
 
-    if not torrents:
+    if not s.results:
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
         return ConversationHandler.END
 
-    save_torrents(pattern, torrents, user.id)
-    reply_torrents(update, context, torrents)
+    s.save(user.id)
+    reply_torrents(update, context, s.results)
 
     return STATE.SEARCH.SELECT
 
@@ -112,42 +111,42 @@ def search_pattern(update, context):
     logging.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
-    torrents = get_torrents(pattern)
+    s = TPB.search(user.id, pattern)
 
-    if not torrents:
+    if not s.results:
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
         return ConversationHandler.END
 
-    save_torrents(pattern, torrents, user.id)
-    reply_torrents(update, context, torrents)
+    s.save()
+    reply_torrents(update, context, s.results)
 
     return STATE.SEARCH.SELECT
 
 
 def search_select(update, context):
     user = update.effective_user
+    message = update.message.text
 
-    if update.message.text == "Cancel":
+    if message == "Cancel":
         logging.info(f"{user.username} ({user.id}) canceled /search conversation")
         return ConversationHandler.END
 
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
-    pattern, torrents = load_torrents(update.effective_user.id)
+    s = Search.load(user.id)
 
-    if update.message.text.endswith("+"):
-        next = int(update.message.text[:-1])
-
-        if next >= len(torrents):
-            torrents = update_saved_torrents(pattern, get_torrents(pattern, page=next // 30), user.id)
-
-        page = next // 10
+    if message.endswith("+"):
+        last = int(message[:-1])
+        page = last // 10
         logging.info(f"{user.username} ({user.id}) asked to see page {page+1} during /search conversation")
-        reply_torrents(update, context, torrents, page=page + 1)
+
+        if last >= len(s.results):
+            s.update(TPB.search(s.user_id, s.pattern, s.pages[-1] + 1))
+
+        reply_torrents(update, context, s.results, page=page + 1)
         return STATE.SEARCH.SELECT
 
-    choice = int(update.message.text)
-    torrent = torrents[choice - 1]
+    torrent = s.results[int(message) - 1]
     logging.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
 
     db_user = User.get_with_id(user.id)
