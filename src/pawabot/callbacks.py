@@ -150,7 +150,7 @@ def search_select(update, context):
     logging.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
 
     db_user = User.get_with_id(user.id)
-    if db_user.is_owner or db_user.has_perm("can_auto_download"):
+    if db_user.is_admin or db_user.has_perm("can_auto_download"):
         api = aria2p.API()
         download = api.add_magnet(torrent.magnet)
         reply = f"The new download is *{download.name}* (gid: {download.gid}, status: {download.status})"
@@ -271,7 +271,7 @@ def parse_magnet(update, context):
     else:
         reply = f"I got your {len(magnets)} magnets, thanks.\n"
 
-    if db_user.is_owner or db_user.has_perm("can_auto_download"):
+    if db_user.is_admin or db_user.has_perm("can_auto_download"):
         api = aria2p.API()
         downloads = []
         for magnet in magnets:
