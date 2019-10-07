@@ -71,59 +71,89 @@ class Search:
 
 
 class ThePirateBay:
-    def __init__(self, proxy=None):
-        # https://pirateproxy.ch
-        # https://tpb6.ukpass.co
-        # https://tpbprox.com
-        # https://thepiratebay.unblockthe.net
-        # https://piratebayblocked.com
-        # https://cruzing.xyz
-        # https://ikwilthepiratebay.org
-        # https://thepiratebay-org.prox3.info
-        # https://uj3wazyk5u4hnvtk.onion.pet
-        # https://uj3wazyk5u4hnvtk.onion.ly/
-        # https://thepiratebay.vip
-        # https://tpb.cloud.louifox.house
-        if not proxy:
-            proxy = "https://pirateproxy.ch"
-        self.proxy = proxy
+    MIRROR_LIST_PAGES = [
+        "https://proxybay.lat",
+        "https://proxybay.github.io"
+    ]
 
-        self.search_url = None
+    def __init__(self, mirrors=None):
+        if not mirrors:
+            # logging.info("No mirrors provided")
+            mirrors = self.get_mirror_list()
+        self.mirrors = [m.rstrip("/") for m in mirrors]
+        self.search_urls = [""] * len(mirrors)
 
-    def get_search_url(self):
+    def get_mirror_list(self):
+        html_page = None
+
+        for mirror_list_page in self.MIRROR_LIST_PAGES:
+            try:
+                # logging.info("Fetching mirrors from " + mirror_list_page)
+                html_page = requests.get(mirror_list_page)
+            except requests.ConnectTimeout:
+                # logging.info("Timeout")
+                continue
+            else:
+                break
+
+        if html_page is None:
+            raise LookupError
+
+        soup = BeautifulSoup(html_page.text, features="lxml")
+        rows = soup.find(id="proxyList").find_all("tr")[1:]
+
+        return [row.find("a")["href"] for row in rows]
+
+    @staticmethod
+    def get_search_url(mirror):
         # url/search/PATTERN/PAGE/ORDER/CATEGORY
-        soup = BeautifulSoup(requests.get(self.proxy).text, features="lxml")
-        return f"{self.proxy.rstrip('/')}/{soup.form['action'].lstrip('/')}"
+        soup = BeautifulSoup(requests.get(mirror).text, features="lxml")
+        return f"{mirror}/{soup.form['action'].lstrip('/')}"
 
     def search(self, user_id, pattern, page=1):
-        if not self.search_url:
-            self.search_url = self.get_search_url()
+        for i, mirror in enumerate(self.mirrors):
+            # logging.info("Fetching torrents from " + mirror)
+            if not self.search_urls[i]:
+                self.search_urls[i] = self.get_search_url(mirror)
+            search_url = self.search_urls[i]
 
-        page_param = "&page=" + str(page - 1)
-        soup = BeautifulSoup(requests.get(self.search_url + f"?q={pattern}{page_param}").text, features="lxml")
+            page_param = "&page=" + str(page - 1)
+            try:
+                html_page = requests.get(search_url + f"?q={pattern}{page_param}")
+            except requests.ConnectTimeout:
+                # logging.info("Timeout")
+                continue
 
-        torrents = []
-        rows = soup.find_all("tr")[1:]
+            soup = BeautifulSoup(html_page.text, features="lxml")
 
-        for row in rows:
-            link = row.find("a", class_="detLink")
-            seeders, leechers = [int(td.text) for td in row.find_all("td")[2:]]
-            extra = row.font.text.split(", ")
+            torrents = []
+            rows = soup.find_all("tr")[1:]
 
-            torrents.append(
-                Torrent(
-                    title=link.text,
-                    magnet=row.find("a", href=re.compile(r"^magnet:\?"))["href"],
-                    url=self.proxy.rstrip("/") + "/" + link["href"].lstrip("/"),
-                    seeders=seeders,
-                    leechers=leechers,
-                    date=extra[0][len("Uploaded ") :],
-                    size=extra[1][len("Size ") :],
-                    uploader=extra[2][len("ULed by ") :],
+            for row in rows:
+                link = row.find("a", class_="detLink")
+                seeders, leechers = [int(td.text) for td in row.find_all("td")[2:]]
+                extra = row.font.text.split(", ")
+
+                torrents.append(
+                    Torrent(
+                        title=link.text,
+                        magnet=row.find("a", href=re.compile(r"^magnet:\?"))["href"],
+                        url=mirror + "/" + link["href"].lstrip("/"),
+                        seeders=seeders,
+                        leechers=leechers,
+                        date=extra[0][len("Uploaded ") :],
+                        size=extra[1][len("Size ") :],
+                        uploader=extra[2][len("ULed by ") :],
+                    )
                 )
-            )
 
-        return Search(user_id, self.proxy, pattern, torrents, [page])
+            if torrents:
+                return Search(user_id, mirror, pattern, torrents, [page])
+            else:
+                # logging.info("No results")
+                pass
+
+        raise LookupError
 
 
 TPB = ThePirateBay()

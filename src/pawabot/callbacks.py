@@ -93,7 +93,7 @@ def search(update, context):
         return STATE.SEARCH.PATTERN
 
     pattern = " ".join(context.args)
-    s = TPB.search(pattern)
+    s = TPB.search(user.id, pattern)
 
     if not s.results:
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
