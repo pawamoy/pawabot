@@ -7,7 +7,7 @@ build:  ## Build the package wheel and sdist.
 	poetry build
 
 .PHONY: check
-check: check-bandit check-black check-flake8 check-isort check-safety check-spelling  ## Check it all!
+check: check-bandit check-black check-flake8 check-isort check-safety  ## Check it all!
 
 .PHONY: check-bandit
 check-bandit:  ## Check for security warnings in code using bandit.
@@ -25,15 +25,15 @@ check-flake8:  ## Check for general warnings in code using flake8.
 check-isort:  ## Check if imports are correctly ordered using isort.
 	poetry run isort -c -rc $(PY_SRC)
 
+.PHONY: check-pylint
+check-pylint:  ## Check for code smells using pylint.
+	poetry run pylint $(PY_SRC)
+
 .PHONY: check-safety
 check-safety:  ## Check for vulnerabilities in dependencies using safety.
 	poetry run pip freeze 2>/dev/null | \
 		grep -v pawabot | \
 		poetry run safety check --stdin --full-report 2>/dev/null
-
-.PHONY: check-spelling
-check-spelling: update-spelling-wordlist  ## Check spelling in the documentation.
-	scripts/check-docs-spelling.sh
 
 .PHONY: clean
 clean: clean-tests  ## Delete temporary files.
@@ -87,8 +87,5 @@ readme:  ## Regenerate README.md.
 
 .PHONY: test
 test: clean-tests  ## Run the tests using pytest.
-	poetry run pytest -n auto 2>/dev/null
-
-.PHONY: update-spelling-wordlist
-update-spelling-wordlist:  ## Update the spelling word list using IDE dictionaries.
-	scripts/update-spelling-wordlist.sh
+	poetry run pytest -n auto -k "$(K)" 2>/dev/null
+	-poetry run coverage html --rcfile=coverage.ini

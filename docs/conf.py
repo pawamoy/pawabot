@@ -15,10 +15,6 @@ master_doc = "index"
 
 extensions = ["sphinx.ext.autodoc", "sphinx.ext.napoleon", "sphinx.ext.viewcode", "recommonmark"]
 
-# Spelling extension, only used when checking it
-if os.environ.get("SPELLING", None):
-    extensions.append("sphinxcontrib.spelling")
-
 # Auto-documentation directives in RST files
 autodoc_default_options = {"members": None, "special-members": "__init__", "exclude-members": "__weakref__"}
 
@@ -38,17 +34,12 @@ napoleon_use_rtype = False
 napoleon_use_param = False
 
 # Documentation in Markdown
-source_suffix = [".rst"]
-source_parsers = {".md": "recommonmark.parser.CommonMarkParser"}
-doc_root = repository + "/tree/master/docs/"
-
-
 def setup(app):
     app.add_config_value(
         "recommonmark_config",
         {
-            "url_resolver": lambda url: doc_root + url,
-            "auto_toc_tree_section": "Welcome to " + metadata["name"] + "'s documentation!",
+            # "url_resolver": lambda url: repository + "/tree/master/docs/" + url,
+            "auto_toc_tree_section": "Welcome to {}'s documentation!".format(metadata["name"]),
         },
         True,
     )
