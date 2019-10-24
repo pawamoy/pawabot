@@ -71,10 +71,7 @@ class Search:
 
 
 class ThePirateBay:
-    MIRROR_LIST_PAGES = [
-        "https://proxybay.lat",
-        "https://proxybay.github.io"
-    ]
+    MIRROR_LIST_PAGES = ["https://proxybay.lat", "https://proxybay.github.io"]
 
     def __init__(self, mirrors=None):
         if not mirrors:

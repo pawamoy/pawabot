@@ -33,13 +33,14 @@ napoleon_use_ivar = True
 napoleon_use_rtype = False
 napoleon_use_param = False
 
+
 # Documentation in Markdown
 def setup(app):
     app.add_config_value(
         "recommonmark_config",
         {
             # "url_resolver": lambda url: repository + "/tree/master/docs/" + url,
-            "auto_toc_tree_section": "Welcome to {}'s documentation!".format(metadata["name"]),
+            "auto_toc_tree_section": "Welcome to {}'s documentation!".format(metadata["name"])
         },
         True,
     )
