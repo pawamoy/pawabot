@@ -64,7 +64,7 @@ def help(update, context):
         /help - To print this help.
         /requestAccess - To request access to my commands.
         /myID - To show your Telegram ID.
-        /myPermissions - To show your current permissions.
+        /myPrivileges - To show your current permissions.
         /search - To search on The Pirate Bay.
         /grant - To grant a permission to a user.
         /revoke - To revoke a permission to a user.
