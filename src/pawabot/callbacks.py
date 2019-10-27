@@ -109,12 +109,12 @@ def search_pattern(update, context):
     user = update.effective_user
     pattern = update.message.text
     logger.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
-    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING, timeout=25)
 
     logger.info(f"Searching '{pattern}' on TPB proxies")
-    s = TPB.search(user.id, pattern)
-
-    if not s.results:
+    try:
+        s = TPB.search(user.id, pattern)
+    except LookupError:
         logger.info(f"No results for '{pattern}' on TPB proxies")
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
         return ConversationHandler.END

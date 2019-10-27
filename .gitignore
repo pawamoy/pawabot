@@ -8,8 +8,6 @@ tests/tmp/*
 !tests/tmp/.gitkeep
 pip-wheel-metadata/
 .pytest_cache/
-db.sqlite3
 owner_id.txt
-poetry.lock
 token.txt
 torrent-search*

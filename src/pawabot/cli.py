@@ -22,11 +22,14 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from privibot import User
+from privibot import User, init
 from privibot import callbacks as privcallbacks
 from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
 from . import callbacks
+from .utils import get_data_dir
+
+DATA_DIR = get_data_dir()
 
 
 def main(args=None):
@@ -56,6 +59,8 @@ def main(args=None):
         ]
     )
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
+
+    init(db_path="sqlite:///" + str(DATA_DIR / "db.sqlite3"))
 
     # with open("owner_id.txt") as stream:
     #     OWNER_ID = stream.read().rstrip("\n")

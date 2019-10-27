@@ -1,8 +1,14 @@
 import json
 import re
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+from loguru import logger
+
+from .utils import get_cache_dir
+
+CACHE_DIR = get_cache_dir()
 
 
 class Torrent:
@@ -38,7 +44,7 @@ class Search:
         self.pages = pages
 
     def save(self):
-        with open(f"torrent-search-{self.user_id}.json", "w") as fp:
+        with open(CACHE_DIR / f"torrent-search-{self.user_id}.json", "w") as fp:
             json.dump(
                 {
                     "user_id": self.user_id,
@@ -59,7 +65,7 @@ class Search:
 
     @staticmethod
     def load(user_id):
-        with open(f"torrent-search-{user_id}.json", "r") as fp:
+        with open(CACHE_DIR / f"torrent-search-{user_id}.json", "r") as fp:
             data = json.load(fp)
         return Search(
             data["user_id"],
@@ -73,10 +79,10 @@ class Search:
 class ThePirateBay:
     MIRROR_LIST_PAGES = ["https://proxybay.lat", "https://proxybay.github.io"]
 
-    def __init__(self, mirrors=None):
+    def __init__(self, mirrors=None, limit=5):
         if not mirrors:
             # logging.info("No mirrors provided")
-            mirrors = self.get_mirror_list()
+            mirrors = self.get_mirror_list()[:limit]
         self.mirrors = [m.rstrip("/") for m in mirrors]
         self.search_urls = [""] * len(mirrors)
 
@@ -104,21 +110,29 @@ class ThePirateBay:
     @staticmethod
     def get_search_url(mirror):
         # url/search/PATTERN/PAGE/ORDER/CATEGORY
-        soup = BeautifulSoup(requests.get(mirror).text, features="html.parser")
+        soup = BeautifulSoup(requests.get(mirror, timeout=5).text, features="html.parser")
         return f"{mirror}/{soup.form['action'].lstrip('/')}"
 
     def search(self, user_id, pattern, page=1):
         for i, mirror in enumerate(self.mirrors):
-            # logging.info("Fetching torrents from " + mirror)
+            logger.info("Fetching torrents from " + mirror)
             if not self.search_urls[i]:
-                self.search_urls[i] = self.get_search_url(mirror)
+                try:
+                    self.search_urls[i] = self.get_search_url(mirror)
+                except (requests.exceptions.SSLError, TypeError) as error:
+                    logger.error(f"Error when requesting home page of {mirror}")
+                    logger.opt(exception=True).trace(error)
+                    continue
+                except (requests.ConnectTimeout, requests.ReadTimeout):
+                    logger.info("Timeout")
+                    continue
             search_url = self.search_urls[i]
 
             page_param = "&page=" + str(page - 1)
             try:
-                html_page = requests.get(search_url + f"?q={pattern}{page_param}")
-            except requests.ConnectTimeout:
-                # logging.info("Timeout")
+                html_page = requests.get(search_url + f"?q={pattern}{page_param}", timeout=5)
+            except (requests.ConnectTimeout, requests.ReadTimeout):
+                logger.info("Timeout")
                 continue
 
             soup = BeautifulSoup(html_page.text, features="html.parser")
@@ -147,7 +161,7 @@ class ThePirateBay:
             if torrents:
                 return Search(user_id, mirror, pattern, torrents, [page])
             else:
-                # logging.info("No results")
+                logger.info("No results")
                 pass
 
         raise LookupError
