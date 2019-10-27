@@ -35,24 +35,21 @@ These projects were used to build pawabot. **Thank you!**
 [`Sphinx`](http://sphinx-doc.org/) |
 [`sphinx-rtd-theme`](https://github.com/rtfd/sphinx_rtd_theme/) |
 [`SQLAlchemy`](http://www.sqlalchemy.org) |
-[`ThePirateBay`](https://github.com/thekarangoel/TPB/) |
 [`toml`](https://github.com/uiri/toml) |
 [`tomlkit`](https://github.com/sdispater/tomlkit)
 
 ### Indirect dependencies
 [`alabaster`](https://alabaster.readthedocs.io) |
-[`ansimarkup`](https://github.com/gvalkov/python-ansimarkup) |
 [`apipkg`](https://github.com/pytest-dev/apipkg) |
 [`appdirs`](http://github.com/ActiveState/appdirs) |
 [`appnope`](http://github.com/minrk/appnope) |
-[`argparse`](https://github.com/ThomasWaldmann/argparse/) |
 [`arrow`](https://arrow.readthedocs.io) |
+[`asciimatics`](https://github.com/peterbrittain/asciimatics) |
 [`astroid`](https://github.com/PyCQA/astroid) |
 [`atomicwrites`](https://github.com/untitaker/python-atomicwrites) |
 [`attrs`](https://www.attrs.org/) |
 [`Babel`](http://babel.pocoo.org/) |
 [`backcall`](https://github.com/takluyver/backcall) |
-[`better-exceptions-fork`](https://github.com/delgan/better-exceptions) |
 [`binaryornot`](https://github.com/audreyr/binaryornot) |
 [`certifi`](https://certifi.io/) |
 [`cffi`](http://cffi.readthedocs.org) |
@@ -62,9 +59,7 @@ These projects were used to build pawabot. **Thank you!**
 [![`commonmark`](https://www.vectorlogo.zone/logos/commonmark/commonmark-ar21.svg)](https://github.com/rtfd/commonmark.py) |
 [`cookiecutter`](https://github.com/audreyr/cookiecutter) |
 [`cryptography`](https://github.com/pyca/cryptography) |
-[`cssselect`](https://github.com/scrapy/cssselect) |
 [`dataclasses`](https://github.com/ericvsmith/dataclasses) |
-[`dateutils`](UNKNOWN) |
 [`decorator`](https://github.com/micheles/decorator) |
 [`docutils`](http://docutils.sourceforge.net/) |
 [`dparse`](https://github.com/jayfk/dparse) |
@@ -85,7 +80,6 @@ These projects were used to build pawabot. **Thank you!**
 [`jinja2-time`](https://github.com/hackebrot/jinja2-time) |
 [`lazy-object-proxy`](https://github.com/ionelmc/python-lazy-object-proxy) |
 [`loguru`](https://github.com/Delgan/loguru) |
-[`lxml`](http://lxml.de/) |
 [`MarkupSafe`](https://palletsprojects.com/p/markupsafe/) |
 [`mccabe`](https://github.com/pycqa/mccabe) |
 [`more-itertools`](https://github.com/erikrose/more-itertools) |
@@ -94,21 +88,24 @@ These projects were used to build pawabot. **Thank you!**
 [`pbr`](https://docs.openstack.org/pbr/latest/) |
 [`pexpect`](https://pexpect.readthedocs.io/) |
 [`pickleshare`](https://github.com/pickleshare/pickleshare) |
+[`Pillow`](http://python-pillow.org) |
 [`pluggy`](https://github.com/pytest-dev/pluggy) |
 [`poyo`](https://github.com/hackebrot/poyo) |
 [`prompt-toolkit`](https://github.com/jonathanslenders/python-prompt-toolkit) |
 [`ptyprocess`](https://github.com/pexpect/ptyprocess) |
-[`purl`](https://github.com/codeinthehole/purl) |
 [`py`](http://py.readthedocs.io/) |
 [`pycodestyle`](https://pycodestyle.readthedocs.io/) |
 [`pycparser`](https://github.com/eliben/pycparser) |
 [`pydantic`](https://github.com/samuelcolvin/pydantic) |
+[`pyfiglet`](https://github.com/pwaller/pyfiglet) |
 [`pyflakes`](https://github.com/PyCQA/pyflakes) |
 [`Pygments`](http://pygments.org/) |
 [`pyparsing`](https://github.com/pyparsing/pyparsing/) |
+[`pypiwin32`](https://pypi.org/project/pypiwin32/) |
 [`pytest-forked`](https://github.com/pytest-dev/pytest-forked) |
 [`python-dateutil`](https://dateutil.readthedocs.io) |
 [`pytz`](http://pythonhosted.org/pytz) |
+[`pywin32`](https://github.com/mhammond/pywin32) |
 [`PyYAML`](https://github.com/yaml/pyyaml) |
 [`six`](https://github.com/benjaminp/six) |
 [`smmap2`](https://github.com/gitpython-developers/smmap) |
@@ -122,7 +119,9 @@ These projects were used to build pawabot. **Thank you!**
 [`typed-ast`](https://github.com/python/typed_ast) |
 [`urllib3`](https://urllib3.readthedocs.io/) |
 [`wcwidth`](https://github.com/jquast/wcwidth) |
+[`websocket-client`](https://github.com/websocket-client/websocket-client.git) |
 [`whichcraft`](https://github.com/pydanny/whichcraft) |
+[`win32-setctime`](https://github.com/Delgan/win32-setctime) |
 [`wrapt`](https://github.com/GrahamDumpleton/wrapt) |
 [`zipp`](https://github.com/jaraco/zipp)
 

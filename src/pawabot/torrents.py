@@ -96,7 +96,7 @@ class ThePirateBay:
         if html_page is None:
             raise LookupError
 
-        soup = BeautifulSoup(html_page.text, features="lxml")
+        soup = BeautifulSoup(html_page.text, features="html.parser")
         rows = soup.find(id="proxyList").find_all("tr")[1:]
 
         return [row.find("a")["href"] for row in rows]
@@ -104,7 +104,7 @@ class ThePirateBay:
     @staticmethod
     def get_search_url(mirror):
         # url/search/PATTERN/PAGE/ORDER/CATEGORY
-        soup = BeautifulSoup(requests.get(mirror).text, features="lxml")
+        soup = BeautifulSoup(requests.get(mirror).text, features="html.parser")
         return f"{mirror}/{soup.form['action'].lstrip('/')}"
 
     def search(self, user_id, pattern, page=1):
@@ -121,7 +121,7 @@ class ThePirateBay:
                 # logging.info("Timeout")
                 continue
 
-            soup = BeautifulSoup(html_page.text, features="lxml")
+            soup = BeautifulSoup(html_page.text, features="html.parser")
 
             torrents = []
             rows = soup.find_all("tr")[1:]

@@ -5,12 +5,17 @@ IMPORTANT:
 -->
 
 # pawabot
+<!--
 [![pipeline status](https://gitlab.com/pawamoy/pawabot/badges/master/pipeline.svg)](https://gitlab.com/pawamoy/pawabot/pipelines)
 [![coverage report](https://gitlab.com/pawamoy/pawabot/badges/master/coverage.svg)](https://gitlab.com/pawamoy/pawabot/commits/master)
 [![documentation](https://img.shields.io/readthedocs/pawabot.svg?style=flat)](https://pawabot.readthedocs.io/en/latest/index.html)
 [![pypi version](https://img.shields.io/pypi/v/pawabot.svg)](https://pypi.org/project/pawabot/)
+-->
 
 A bot for many things: aria2 management, torrent sites crawling, media organization with filebot and plex.
+
+This bot provides a command to search for torrents on the web, and let you select them for download.
+There is a basic permission system allowing to manage multiple users for one bot.
 
 ## Requirements
 pawabot requires Python 3.6 or above.
@@ -49,10 +54,16 @@ curl https://raw.githubusercontent.com/cs01/pipx/master/get-pipx.py | python3
 pipx install --python python3.6 pawabot
 ```
 
-## Usage (as a library)
-TODO
+## Setup
+1. Create your Telegram bot account by talking to the `@godfather` bot.
+2. Write your bot token in `~/.config/pawabot/bot_token.txt`,
+   or set and export the environment variable `BOT_TOKEN`.
+3. Register your Telegram main account as administrator in the database with:
+```
+pawabot create-admin -i MY_TG_ID -u MY_TG_USERNAME
+```
 
-## Usage (command-line)
+## Usage
 ```
 {{ command_line_help }}
 ```
@@ -69,3 +80,8 @@ TODO
 
 {% include "command_" + command.name.replace("-", "_") + "_extra.md" ignore missing %}
 {% endfor %}{% endif %}
+
+## Screenshots
+/start | /help | /search
+------ | ----- | -------
+![start](img/start.jpg) | ![help](img/help.jpg) | ![search](img/search.jpg)

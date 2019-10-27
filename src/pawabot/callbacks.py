@@ -1,9 +1,9 @@
-import logging
 import random
 import re
 from textwrap import dedent
 
 import aria2p
+from loguru import logger
 from privibot import User, require_access, require_privileges
 from telegram import (  # InlineQueryResultArticle, InputTextMessageContent,
     ChatAction,
@@ -24,7 +24,7 @@ class STATE:
 
 def start(update, context):
     tg_user = update.effective_user
-    logging.info(f"{tg_user.username} ({tg_user.id}) called /start")
+    logger.info(f"{tg_user.username} ({tg_user.id}) called /start")
 
     db_user = User.get_with_id(tg_user.id)
 
@@ -57,7 +57,7 @@ def start(update, context):
 @require_access
 def help(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called /help")
+    logger.info(f"{user.username} ({user.id}) called /help")
     text = dedent(
         """
         /start - To get an introduction.
@@ -77,14 +77,14 @@ def help(update, context):
 @require_access
 def my_id(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called /myID")
+    logger.info(f"{user.username} ({user.id}) called /myID")
     context.bot.send_message(chat_id=update.message.chat_id, text=update.effective_user.id)
 
 
 @require_privileges([Privileges.DOWNLOADER])
 def search(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) called /search with args={context.args}")
+    logger.info(f"{user.username} ({user.id}) called /search with args={context.args}")
 
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -108,15 +108,18 @@ def search(update, context):
 def search_pattern(update, context):
     user = update.effective_user
     pattern = update.message.text
-    logging.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
+    logger.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
+    logger.info(f"Searching '{pattern}' on TPB proxies")
     s = TPB.search(user.id, pattern)
 
     if not s.results:
+        logger.info(f"No results for '{pattern}' on TPB proxies")
         context.bot.send_message(chat_id=update.message.chat_id, text="No results")
         return ConversationHandler.END
 
+    logger.info(f"Saving results for '{pattern}'")
     s.save()
     reply_torrents(update, context, s.results)
 
@@ -128,7 +131,7 @@ def search_select(update, context):
     message = update.message.text
 
     if message == "Cancel":
-        logging.info(f"{user.username} ({user.id}) canceled /search conversation")
+        logger.info(f"{user.username} ({user.id}) canceled /search conversation")
         return ConversationHandler.END
 
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
@@ -138,7 +141,7 @@ def search_select(update, context):
     if message.endswith("+"):
         last = int(message[:-1])
         page = last // 10
-        logging.info(f"{user.username} ({user.id}) asked to see page {page+1} during /search conversation")
+        logger.info(f"{user.username} ({user.id}) asked to see page {page+1} during /search conversation")
 
         if last >= len(s.results):
             s.update(TPB.search(s.user_id, s.pattern, s.pages[-1] + 1))
@@ -147,14 +150,14 @@ def search_select(update, context):
         return STATE.SEARCH.SELECT
 
     torrent = s.results[int(message) - 1]
-    logging.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
+    logger.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
 
     db_user = User.get_with_id(user.id)
     if db_user.is_admin or db_user.has_perm("can_auto_download"):
         api = aria2p.API()
         download = api.add_magnet(torrent.magnet)
         reply = f"The new download is *{download.name}* (gid: {download.gid}, status: {download.status})"
-        logging.info(f"torrent '{download.name}' (gid: {download.gid}) was added to aria2")
+        logger.info(f"torrent '{download.name}' (gid: {download.gid}) was added to aria2")
     else:
         reply = (
             f"A download request has been sent to an administrator. "
@@ -204,24 +207,24 @@ def reply_torrents(update, context, torrents, page=1):
 # def inline_search(update, context):
 #     query = update.inline_query.query
 #     user = update.inline_query.from_user
-#     logging.info(f"{user.username} ({user.id}) called inline search with {query}")
+#     logger.info(f"{user.username} ({user.id}) called inline search with {query}")
 #
 #     if not query:
-#         logging.info("inline search: query is empty, aborting")
+#         logger.info("inline search: query is empty, aborting")
 #         return
 #
 #     output = None
 #     retries = 2
 #
 #     while not output and retries > 0:
-#         logging.info(f"running pirate-bay-search")
+#         logger.info(f"running pirate-bay-search")
 #         try:
 #             output = (
 #                 subprocess.check_output(["pirate-bay-search", query], timeout=5).decode(encoding="utf-8").rstrip("\n")
 #             )
 #         except subprocess.TimeoutExpired:
 #             retries -= 1
-#             logging.warn(f"pirate-bay-search timeout, retries left: {retries}")
+#             logger.warn(f"pirate-bay-search timeout, retries left: {retries}")
 #
 #     if retries == 0:
 #         context.bot.answer_inline_query(
@@ -236,7 +239,7 @@ def reply_torrents(update, context, torrents, page=1):
 #         )
 #         return
 #
-#     logging.debug("pirate-bay-search results:\n\n" + output)
+#     logger.debug("pirate-bay-search results:\n\n" + output)
 #
 #     results = []
 #     for i, torrent in enumerate(output.split("\n\n")):
@@ -260,7 +263,7 @@ MAGNET_RE = r"\bmagnet:\?xt=urn:[A-Za-z0-9]+:[A-Za-z0-9]{32,40}(?:&(?:amp;)?dn=.
 @require_privileges([Privileges.DOWNLOADER])
 def parse_magnet(update, context):
     tg_user = update.effective_user
-    logging.info(f"{tg_user.username} ({tg_user.id}) sent magnet(s)")
+    logger.info(f"{tg_user.username} ({tg_user.id}) sent magnet(s)")
 
     db_user = User.get_with_id(tg_user.id)
 
@@ -290,7 +293,7 @@ def parse_magnet(update, context):
 
 def cancel(update, context):
     user = update.message.from_user
-    logging.info("User %s canceled the conversation.", user.first_name)
+    logger.info("User %s canceled the conversation.", user.first_name)
     update.message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
 
 
@@ -306,7 +309,7 @@ def test(update, context):
 @require_access
 def unknown_command(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) typed unknown command: {update.message.text}")
+    logger.info(f"{user.username} ({user.id}) typed unknown command: {update.message.text}")
     context.bot.send_message(
         chat_id=update.message.chat_id, text="I did not understand that command. Please type /help to see the commands."
     )
@@ -315,7 +318,7 @@ def unknown_command(update, context):
 @require_access
 def unknown(update, context):
     user = update.message.from_user
-    logging.info(f"{user.username} ({user.id}) typed unknown text: {update.message.text}")
+    logger.info(f"{user.username} ({user.id}) typed unknown text: {update.message.text}")
     text = random.choice(  # nosec
         [
             "yo",
