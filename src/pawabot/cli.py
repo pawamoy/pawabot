@@ -22,8 +22,9 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from privibot import User, init
+from privibot import User
 from privibot import callbacks as privcallbacks
+from privibot import init
 from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
 from . import callbacks
