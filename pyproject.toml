@@ -4,7 +4,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "pawabot"
-version = "0.1.0"
+version = "0.1.1"
 description = "A bot for many things: aria2 management, torrent sites crawling, media organization with filebot and plex."
 authors = ["Timothée Mazzucotelli <pawamoy@pm.me>"]
 license = "ISC License"
