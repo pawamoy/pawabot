@@ -48,14 +48,13 @@ python3.6 -m pip install pawabot
 
 With [`pipx`](https://github.com/cs01/pipx):
 ```bash
-# install pipx with the recommended method
-curl https://raw.githubusercontent.com/cs01/pipx/master/get-pipx.py | python3
+python3.6 -m pip install --user pipx
 
 pipx install --python python3.6 pawabot
 ```
 
 ## Setup
-1. Create your Telegram bot account by talking to the `@godfather` bot.
+1. Create your Telegram bot account by talking to the `@botfather` bot.
 2. Write your bot token in `~/.config/pawabot/bot_token.txt`,
    or set and export the environment variable `BOT_TOKEN`.
 3. Register your Telegram main account as administrator in the database with:
