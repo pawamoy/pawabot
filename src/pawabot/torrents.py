@@ -161,7 +161,6 @@ class ThePirateBay:
                 return Search(user_id, mirror, pattern, torrents, [page])
             else:
                 logger.info("No results")
-                pass
 
         raise LookupError
 
