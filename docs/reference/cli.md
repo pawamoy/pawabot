@@ -1,0 +1,1 @@
+::: pawabot.cli

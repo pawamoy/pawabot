@@ -1,0 +1,35 @@
+site_name: "pawabot"
+site_description: "My personal Telegram bot: aria2 management, torrent sites crawling, media organization with mvodb and Plex, etc."
+site_url: "https://pawamoy.github.io/pawabot"
+repo_url: "https://github.com/pawamoy/pawabot"
+repo_name: "pawamoy/pawabot"
+
+nav:
+  - Overview: index.md
+  - Reference:
+    - cli.py: reference/cli.md
+  - Contributing: contributing.md
+  - Code of Conduct: code_of_conduct.md
+  - Changelog: changelog.md
+  - Credits: credits.md
+
+theme:
+  name: material
+
+extra_css:
+  - css/mkdocstrings.css
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - pymdownx.superfences
+  - pymdownx.emoji
+  - toc:
+      permalink: "¤"
+
+plugins:
+  - search
+  - mkdocstrings:
+      watch:
+        - src/pawabot

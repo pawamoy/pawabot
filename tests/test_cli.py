@@ -1,5 +1,23 @@
+"""Tests for the `cli` module."""
+
+import pytest
+
 from pawabot import cli
 
 
 def test_main():
-    assert cli
+    """Basic CLI test."""
+    assert cli.main([]) == 0
+
+
+def test_show_help(capsys):
+    """
+    Shows help.
+
+    Arguments:
+        capsys: Pytest fixture to capture output.
+    """
+    with pytest.raises(SystemExit):
+        cli.main(["-h"])
+    captured = capsys.readouterr()
+    assert "pawabot" in captured.out
