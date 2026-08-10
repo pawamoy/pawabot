@@ -112,7 +112,7 @@ def update_changelog(inplace_file: str, marker: str, version_regex: str) -> None
     write_changelog(inplace_file, lines)
 
 
-def main(args):
+def main(args: list[str]) -> int:
     """Run the main script.
 
     Arguments:

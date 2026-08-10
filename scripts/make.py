@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright (c) 2020, Timothée Mazzucotelli and contributors
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -12,7 +13,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import os

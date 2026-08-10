@@ -12,6 +12,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import annotations
+
 import random
 import re
 from textwrap import dedent
@@ -328,7 +330,9 @@ def search_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
-def reply_torrents(update: Update, context: ContextTypes.DEFAULT_TYPE, torrents: list | None = None, page: int = 1) -> None:
+def reply_torrents(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, torrents: list | None = None, page: int = 1
+) -> None:
     x = (page - 1) * 10
     y = x + 10
 

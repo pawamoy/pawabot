@@ -12,8 +12,11 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import annotations
+
 import json
 import re
+from typing import Any
 
 import httpx2
 from bs4 import BeautifulSoup
@@ -25,7 +28,17 @@ CACHE_DIR = get_cache_dir()
 
 
 class Torrent:
-    def __init__(self, title, magnet, url, seeders, leechers, date, size, uploader):
+    def __init__(
+        self,
+        title: str,
+        magnet: str,
+        url: str,
+        seeders: int,
+        leechers: int,
+        date: str,
+        size: str,
+        uploader: str,
+    ) -> None:
         self.title = title
         self.magnet = magnet
         self.url = url
@@ -35,7 +48,7 @@ class Torrent:
         self.size = size
         self.uploader = uploader
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, Any]:
         return dict(
             title=self.title,
             magnet=self.magnet,
@@ -49,14 +62,14 @@ class Torrent:
 
 
 class Search:
-    def __init__(self, user_id, proxy, pattern, results, pages):
+    def __init__(self, user_id: int, proxy: str, pattern: str, results: list[Torrent], pages: list[int]) -> None:
         self.user_id = user_id
         self.proxy = proxy
         self.pattern = pattern
         self.results = results
         self.pages = pages
 
-    def save(self):
+    def save(self) -> None:
         with open(CACHE_DIR / f"torrent-search-{self.user_id}.json", "w") as fp:
             json.dump(
                 {
@@ -69,7 +82,7 @@ class Search:
                 fp,
             )
 
-    def update(self, search):
+    def update(self, search: Search) -> None:
         if self.proxy != search.proxy or self.pattern != search.pattern or self.user_id != search.user_id:
             raise ValueError
         self.results.extend(search.results)
@@ -77,7 +90,7 @@ class Search:
         self.save()
 
     @staticmethod
-    def load(user_id):
+    def load(user_id: int) -> Search:
         with open(CACHE_DIR / f"torrent-search-{user_id}.json") as fp:
             data = json.load(fp)
         return Search(
@@ -92,14 +105,14 @@ class Search:
 class ThePirateBay:
     MIRROR_LIST_PAGES = ["https://proxybay.lat", "https://proxybay.github.io"]
 
-    def __init__(self, mirrors=None, limit=5):
+    def __init__(self, mirrors: list[str] | None = None, limit: int = 5) -> None:
         if not mirrors:
             # logging.info("No mirrors provided")
             mirrors = self.get_mirror_list()[:limit]
         self.mirrors = [m.rstrip("/") for m in mirrors]
         self.search_urls = [""] * len(mirrors)
 
-    def get_mirror_list(self):
+    def get_mirror_list(self) -> list[str]:
         html_page = None
 
         for mirror_list_page in self.MIRROR_LIST_PAGES:
@@ -121,12 +134,12 @@ class ThePirateBay:
         return [row.find("a")["href"] for row in rows]
 
     @staticmethod
-    def get_search_url(mirror):
+    def get_search_url(mirror: str) -> str:
         # url/search/PATTERN/PAGE/ORDER/CATEGORY
         soup = BeautifulSoup(httpx2.get(mirror, timeout=5).text, features="html.parser")
         return f"{mirror}/{soup.form['action'].lstrip('/')}"
 
-    def search(self, user_id, pattern, page=1):
+    def search(self, user_id: int, pattern: str, page: int = 1) -> Search:
         for i, mirror in enumerate(self.mirrors):
             logger.info("Fetching torrents from " + mirror)
             if not self.search_urls[i]:

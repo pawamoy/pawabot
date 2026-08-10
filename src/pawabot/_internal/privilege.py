@@ -12,11 +12,13 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import annotations
+
 from typing import Any
 
 
 class Privilege:
-    def __init__(self, name, verbose_name, description):
+    def __init__(self, name: str, verbose_name: str, description: str) -> None:
         self.name = name
         self.verbose_name = verbose_name
         self.description = description
@@ -25,7 +27,7 @@ class Privilege:
 class _PrivilegesMetaclass(type):
     mapping_name = "__privilege_mapping__"
 
-    def __new__(mcs, cls, bases, dct):
+    def __new__(mcs: type, cls: str, bases: tuple, dct: dict[str, Any]) -> type:  # type: ignore[override]
         super_new = super().__new__
 
         mapping = {}
@@ -41,5 +43,5 @@ class _PrivilegesMetaclass(type):
 
 class Privileges(metaclass=_PrivilegesMetaclass):
     @classmethod
-    def get(cls, privilege_name):
+    def get(cls, privilege_name: str) -> Privilege | None:
         return cls.__getattribute__(_PrivilegesMetaclass.mapping_name).get(privilege_name)

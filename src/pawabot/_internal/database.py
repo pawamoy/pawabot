@@ -12,6 +12,10 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import annotations
+
+from typing import Any
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -30,15 +34,15 @@ class User(Base):
 
     privileges = relationship("UserPrivilege", back_populates="user")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<User(uid={self.uid}, username='{self.username}', is_admin={self.is_admin})>"
 
     @staticmethod
-    def all():
+    def all() -> list[User]:
         return list(session.query(User))
 
     @staticmethod
-    def get(int_or_string):
+    def get(int_or_string: int | str) -> User | None:
         if isinstance(int_or_string, int):
             return User.get_with_id(int_or_string)
         try:
@@ -49,44 +53,44 @@ class User(Base):
             return User.get_with_id(uid)
 
     @staticmethod
-    def get_with_id(uid):
+    def get_with_id(uid: int) -> User | None:
         return session.query(User).filter(User.uid == uid).first()
 
     @staticmethod
-    def get_with_username(username):
+    def get_with_username(username: str) -> User | None:
         return session.query(User).filter(User.username == username).first()
 
     @staticmethod
-    def create(uid, username=None, is_admin=False):
-        user = User(uid=uid, username=username or "???", is_admin=is_admin)
+    def create(uid: int, username: str | None = None, is_admin: bool = False) -> User:
+        user = User(uid=uid, username=username or "?", is_admin=is_admin)
         session.add(user)
         session.commit()
         return user
 
-    def has_privilege(self, privilege):
+    def has_privilege(self, privilege: Any) -> bool:
         return privilege.name in set(up.privilege for up in self.privileges)
 
-    def has_privileges(self, privileges):
+    def has_privileges(self, privileges: list) -> bool:
         return set(p.name for p in privileges).issubset(set(up.privilege for up in self.privileges))
 
-    def get_privilege(self, privilege):
+    def get_privilege(self, privilege: Any) -> Any | None:
         for up in self.privileges:
             if up.privilege == privilege:
                 return up
         return None
 
-    def grant(self, privilege):
+    def grant(self, privilege: Any) -> bool:
         session.add(UserPrivilege(user_id=self.uid, privilege=privilege.name))
         session.commit()
         return True
 
-    def revoke(self, privilege):
+    def revoke(self, privilege: Any) -> bool:
         session.delete(self.get_privilege(privilege))
         session.commit()
         return True
 
 
-def save():
+def save() -> None:
     session.commit()
 
 
@@ -100,11 +104,11 @@ class UserPrivilege(Base):
 
     user = relationship("User", back_populates="privileges")
 
-    def __repr__(self):
-        return f"<UserPrivilege(user={self.user!r}, privilege='{self.privilege}')>"
+    def __repr__(self) -> str:
+        return rf"<UserPrivilege(user={self.user!r}, privilege='{self.privilege}')\>"
 
 
-def init(db_path="sqlite:///db.sqlite3"):
+def init(db_path: str = "sqlite:///db.sqlite3") -> Any:
     global session
 
     # connection

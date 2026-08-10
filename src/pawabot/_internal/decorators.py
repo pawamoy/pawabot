@@ -12,13 +12,22 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
 from functools import wraps
+from typing import Any, TypeVar
+
+from telegram import Update
+from telegram.ext import ContextTypes
 
 from pawabot._internal.database import User, save
 
+F = TypeVar("F", bound=Callable[..., Any])
 
-def _require_access(update, context, func_name):
+
+def _require_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> User:
     db_user = User.get_with_id(update.effective_user.id)
 
     # user does not have access to the bot
@@ -34,9 +43,9 @@ def _require_access(update, context, func_name):
     return db_user
 
 
-def require_access(func):
+def require_access(func: F) -> F:
     @wraps(func)
-    def wrapped(update, context, *args, **kwargs):
+    def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args: Any, **kwargs: Any) -> Any:
         try:
             _require_access(update, context, func.__name__)
         except PermissionError:
@@ -47,9 +56,9 @@ def require_access(func):
     return wrapped
 
 
-def require_admin(func):
+def require_admin(func: F) -> F:
     @wraps(func)
-    def wrapped(update, context, *args, **kwargs):
+    def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args: Any, **kwargs: Any) -> Any:
         try:
             db_user = _require_access(update, context, func.__name__)
         except PermissionError:
@@ -63,10 +72,10 @@ def require_admin(func):
     return wrapped
 
 
-def require_privileges(privileges):
-    def decorator(func):
+def require_privileges(privileges: list) -> Callable[[F], F]:
+    def decorator(func: F) -> F:
         @wraps(func)
-        def wrapped(update, context, *args, **kwargs):
+        def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args: Any, **kwargs: Any) -> Any:
             try:
                 db_user = _require_access(update, context, func.__name__)
             except PermissionError:
@@ -85,12 +94,12 @@ def require_privileges(privileges):
     return decorator
 
 
-def deny_access(update, context, func_name):
+def deny_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> None:
     logging.warning(
         f"Unauthorized access denied for {update.effective_user.username} ({update.effective_user.id}) "
         f"on function {func_name}",
     )
     context.bot.send_message(
-        chat_id=update.message.chat_id,
+        chat_id=update.effective_chat.id,
         text="Sorry, you don't have the required permissions to do that.Try to contact the administrator of this bot.",
     )
