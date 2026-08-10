@@ -23,8 +23,6 @@
 # - When you import `__main__` it will get executed again (as a module) because
 #   there's no `pawabot.__main__` in `sys.modules`.
 
-"""Module that contains the command line application."""
-
 import argparse
 import logging
 import os
@@ -32,7 +30,13 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 from pawabot._internal import callbacks
 from pawabot._internal.database import User, init
@@ -65,7 +69,7 @@ def get_parser() -> argparse.ArgumentParser:
     #     "-P", "--log-path", dest="log_path", default=None, help="Log path to use. Can be a directory or a file."
     # )
 
-    def create_subparser(command, text, **kwargs):
+    def create_subparser(command: str, text: str, **kwargs: object) -> argparse.ArgumentParser:
         sub = subparsers.add_parser(command, add_help=False, help=text, description=text, **kwargs)
         sub.add_argument("-h", "--help", action="help", help=subcommand_help)
         return sub
@@ -107,13 +111,13 @@ def main(args: list[str] | None = None) -> int:
     parser = get_parser()
     args = parser.parse_args(args=args)
 
-    def log_level_to_name(level):
+    def log_level_to_name(level: int) -> str:
         for log_name in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             if level == getattr(logging, log_name):
                 return log_name
 
     class InterceptHandler(logging.Handler):
-        def emit(self, record):
+        def emit(self, record: logging.LogRecord) -> None:
             # Retrieve context where the logging call occurred, this happens to be in the 6th frame upward
             logger_opt = logger.opt(depth=6, exception=record.exc_info)
             logger_opt.log(log_level_to_name(record.levelno), record.getMessage())
@@ -158,22 +162,24 @@ def main(args: list[str] | None = None) -> int:
             with (Path.home() / ".config" / "pawabot" / "bot_token.txt").open() as stream:
                 bot_token = stream.read().rstrip("\n")
 
-        updater = Updater(token=bot_token, use_context=True)
-        dispatcher = updater.dispatcher
+        app = ApplicationBuilder().token(bot_token).build()
 
-        dispatcher.add_handler(CommandHandler("start", callbacks.start))
-        dispatcher.add_handler(CommandHandler("help", callbacks.help))
-        dispatcher.add_handler(CommandHandler("myID", callbacks.my_id))
-        dispatcher.add_handler(CommandHandler("myPrivileges", callbacks.my_privileges))
-        dispatcher.add_handler(CommandHandler("requestAccess", callbacks.request_access))
-        dispatcher.add_handler(CommandHandler("grant", callbacks.grant, pass_args=True))
-        dispatcher.add_handler(CommandHandler("revoke", callbacks.revoke, pass_args=True))
+        app.add_handler(CommandHandler("start", callbacks.start))
+        app.add_handler(CommandHandler("help", callbacks.help))
+        app.add_handler(CommandHandler("myID", callbacks.my_id))
+        app.add_handler(CommandHandler("myPrivileges", callbacks.my_privileges))
+        app.add_handler(CommandHandler("requestAccess", callbacks.request_access))
+        app.add_handler(CommandHandler("grant", callbacks.grant))
+        app.add_handler(CommandHandler("revoke", callbacks.revoke))
 
-        handler_search = CommandHandler("search", callbacks.search, pass_args=True)
-        handler_search_pattern = MessageHandler(Filters.text, callbacks.search_pattern)
-        handler_search_select = MessageHandler(Filters.regex(r"^([1-9][0-9]*\+?|Cancel)$"), callbacks.search_select)
+        handler_search = CommandHandler("search", callbacks.search)
+        handler_search_pattern = MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks.search_pattern)
+        handler_search_select = MessageHandler(
+            filters.Regex(r"^([1-9][0-9]*\+?|Cancel)$"),
+            callbacks.search_select,
+        )
 
-        dispatcher.add_handler(
+        app.add_handler(
             ConversationHandler(
                 entry_points=[handler_search],
                 states={
@@ -184,22 +190,20 @@ def main(args: list[str] | None = None) -> int:
             ),
         )
 
-        dispatcher.add_handler(handler_search)
+        # Duplicate search handler outside conversation to allow /search at any time.
+        app.add_handler(handler_search)
 
-        # dispatcher.add_handler(InlineQueryHandler(callbacks.inline_search))
+        # app.add_handler(InlineQueryHandler(callbacks.inline_search))
 
-        dispatcher.add_handler(MessageHandler(Filters.regex(callbacks.MAGNET_RE), callbacks.parse_magnet))
+        app.add_handler(MessageHandler(filters.Regex(callbacks.MAGNET_RE), callbacks.parse_magnet))
 
-        dispatcher.add_handler(CommandHandler("test", callbacks.test))
+        app.add_handler(CommandHandler("test", callbacks.test))
 
-        dispatcher.add_handler(MessageHandler(Filters.command, callbacks.unknown_command))
-        dispatcher.add_handler(MessageHandler(Filters.text, callbacks.unknown))
+        app.add_handler(MessageHandler(filters.COMMAND, callbacks.unknown_command))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks.unknown))
 
         logging.info("Starting Bot")
-        updater.start_polling()
-
-        logging.info("Putting Bot in idle mode")
-        updater.idle()
+        app.run_polling()
 
         return 0
 

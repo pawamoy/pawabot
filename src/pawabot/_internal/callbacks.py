@@ -18,16 +18,19 @@ from textwrap import dedent
 
 import aria2p
 from loguru import logger
-from telegram import (  # InlineQueryResultArticle, InputTextMessageContent,
-    ChatAction,
-    ParseMode,
+from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    Update,
 )
-from telegram.ext import ConversationHandler
+from telegram.constants import ChatAction, ParseMode
+from telegram.ext import (
+    ContextTypes,
+    ConversationHandler,
+)
 
 from pawabot._internal.database import User
-from pawabot._internal.decorators import require_access, require_privileges
+from pawabot._internal.decorators import require_access, require_admin, require_privileges
 from pawabot._internal.privileges import Privileges
 from pawabot._internal.torrents import TPB, Search
 
@@ -37,7 +40,7 @@ class STATE:
         PATTERN, SELECT = range(2)
 
 
-def start(update, context):
+def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_user = update.effective_user
     logger.info(f"{tg_user.username} ({tg_user.id}) called /start")
 
@@ -66,12 +69,12 @@ def start(update, context):
             """,
         )
 
-    context.bot.send_message(chat_id=update.message.chat_id, text=text)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
 
 @require_access
-def help(update, context):
-    user = update.message.from_user
+def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
     logger.info(f"{user.username} ({user.id}) called /help")
     text = dedent(
         """
@@ -86,32 +89,169 @@ def help(update, context):
     """,
     )
 
-    context.bot.send_message(chat_id=update.message.chat_id, text=text, parse_mode=ParseMode.MARKDOWN)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode=ParseMode.MARKDOWN)
 
 
 @require_access
-def my_id(update, context):
-    user = update.message.from_user
+def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
     logger.info(f"{user.username} ({user.id}) called /myID")
-    context.bot.send_message(chat_id=update.message.chat_id, text=update.effective_user.id)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=user.id)
+
+
+@require_privileges([])
+def my_privileges(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info(f"{user.username} ({user.id}) called /myPrivileges")
+    db_user = User.get_with_id(user.id)
+
+    text = []
+    if db_user:
+        if db_user.is_admin:
+            text.append("You are an administrator: you have full access to all commands.\n")
+        privileges = list(db_user.privileges) if db_user else []
+        if privileges:
+            text.append("\n" + "\n".join(privileges))
+        else:
+            text.append("You have zero privileges.")
+    else:
+        text.append("You do not have access to my commands.")
+
+    context.bot.send_message(chat_id=update.effective_chat.id, text="".join(text))
+
+
+def request_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    tg_user = update.effective_user
+    logger.info(f"{tg_user.username} ({tg_user.id}) called /requestAccess")
+
+    user = User.get_with_id(tg_user.id)
+
+    if not user:
+        User.create(tg_user.id, tg_user.username)
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="I received your request. Please wait for feedback.",
+        )
+    else:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"I already know you {tg_user.username}! No need to request access!",
+        )
+
+
+@require_admin
+def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    tg_user = update.effective_user
+    logger.info(f"{tg_user.username} ({tg_user.id}) called /grant")
+
+    if not context.args or len(context.args) != 2:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Usage is /grant <ID_OR_USERNAME> <PERMISSION>",
+        )
+        return
+
+    permission = context.args[1]
+    user = User.get(context.args[0])
+
+    if not user:
+        try:
+            uid = int(context.args[0])
+        except ValueError:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="I don't know that user, please ask them to send '/requestAccess' to me.",
+            )
+            return
+        else:
+            user = User.create(uid)
+
+    if user.has_perm(permission):
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"User {user.username} ({user.uid}) already has permission '{permission}'.",
+        )
+        return
+
+    user.grant(permission)
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"Done! User {user.username} ({user.uid}) now has permission '{permission}'.",
+    )
+
+    if update.effective_user.id != user.uid:
+        context.bot.send_message(
+            chat_id=user.uid,
+            text=f"Hi! You've been granted the permission '{permission}' "
+            f"just now by {update.effective_user.username} on "
+            f"the bot called '{context.bot.username}'. "
+            f"If you don't know what this means, just ignore this message!",
+        )
+
+
+@require_admin
+def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args or len(context.args) != 2:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Usage is /revoke <ID_OR_USERNAME> <PERMISSION>",
+        )
+        return
+
+    permission = context.args[1]
+    user = User.get(context.args[0])
+
+    if not user:
+        try:
+            uid = int(context.args[0])
+        except ValueError:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="I don't know that user, please ask them to send '/requestAccess' to me.",
+            )
+            return
+        else:
+            user = User.create(uid)
+
+    if not user.has_perm(permission):
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"User {user.username} ({user.uid}) does not have permission '{permission}'.",
+        )
+        return
+
+    user.revoke(permission)
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"Done! User {user.username} ({user.uid}) just lost permission '{permission}'.",
+    )
+
+    if update.effective_user.id != user.uid:
+        context.bot.send_message(
+            chat_id=user.uid,
+            text=f"Hi! You've been revoked the permission '{permission}' "
+            f"just now by {update.effective_user.username} on "
+            f"the bot called '{context.bot.username}'. "
+            f"If you don't know what this means, just ignore this message!",
+        )
 
 
 @require_privileges([Privileges.DOWNLOADER])
-def search(update, context):
-    user = update.message.from_user
+def search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int | None:
+    user = update.effective_user
     logger.info(f"{user.username} ({user.id}) called /search with args={context.args}")
 
-    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
 
     if not context.args:
-        context.bot.send_message(chat_id=update.message.chat_id, text="What do you want to search?")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="What do you want to search?")
         return STATE.SEARCH.PATTERN
 
     pattern = " ".join(context.args)
     s = TPB.search(user.id, pattern)
 
     if not s.results:
-        context.bot.send_message(chat_id=update.message.chat_id, text="No results")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="No results")
         return ConversationHandler.END
 
     s.save(user.id)
@@ -120,18 +260,18 @@ def search(update, context):
     return STATE.SEARCH.SELECT
 
 
-def search_pattern(update, context):
+def search_pattern(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
-    pattern = update.message.text
+    pattern = update.effective_message.text
     logger.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
-    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING, timeout=25)
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING, timeout=25)
 
     logger.info(f"Searching '{pattern}' on TPB proxies")
     try:
         s = TPB.search(user.id, pattern)
     except LookupError:
         logger.info(f"No results for '{pattern}' on TPB proxies")
-        context.bot.send_message(chat_id=update.message.chat_id, text="No results")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="No results")
         return ConversationHandler.END
 
     logger.info(f"Saving results for '{pattern}'")
@@ -141,15 +281,15 @@ def search_pattern(update, context):
     return STATE.SEARCH.SELECT
 
 
-def search_select(update, context):
+def search_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
-    message = update.message.text
+    message = update.effective_message.text
 
     if message == "Cancel":
         logger.info(f"{user.username} ({user.id}) canceled /search conversation")
         return ConversationHandler.END
 
-    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
 
     s = Search.load(user.id)
 
@@ -179,7 +319,7 @@ def search_select(update, context):
         )
 
     context.bot.send_message(
-        chat_id=update.message.chat_id,
+        chat_id=update.effective_chat.id,
         text=reply,
         reply_markup=ReplyKeyboardRemove(),
         parse_mode=ParseMode.MARKDOWN,
@@ -188,7 +328,7 @@ def search_select(update, context):
     return ConversationHandler.END
 
 
-def reply_torrents(update, context, torrents, page=1):
+def reply_torrents(update: Update, context: ContextTypes.DEFAULT_TYPE, torrents: list | None = None, page: int = 1) -> None:
     x = (page - 1) * 10
     y = x + 10
 
@@ -212,7 +352,7 @@ def reply_torrents(update, context, torrents, page=1):
     keyboard_buttons.append(third_row)
 
     context.bot.send_message(
-        chat_id=update.message.chat_id,
+        chat_id=update.effective_chat.id,
         text="".join(reply_text),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=ReplyKeyboardMarkup(keyboard_buttons, one_time_keyboard=True, resize_keyboard=True),
@@ -277,13 +417,13 @@ MAGNET_RE = r"\bmagnet:\?xt=urn:[A-Za-z0-9]+:[A-Za-z0-9]{32,40}(?:&(?:amp;)?dn=.
 
 
 @require_privileges([Privileges.DOWNLOADER])
-def parse_magnet(update, context):
+def parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_user = update.effective_user
     logger.info(f"{tg_user.username} ({tg_user.id}) sent magnet(s)")
 
     db_user = User.get_with_id(tg_user.id)
 
-    magnets = re.findall(MAGNET_RE, update.message.text)
+    magnets = re.findall(MAGNET_RE, update.effective_message.text)
 
     if len(magnets) == 1:
         reply = "I got your magnet, thanks.\n"
@@ -303,38 +443,38 @@ def parse_magnet(update, context):
             "You must now wait for the administrator to accept them.\nYou will receive a notification when it's done!"
         )
 
-    context.bot.send_message(chat_id=update.message.chat_id, text=reply, parse_mode=ParseMode.MARKDOWN)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=reply, parse_mode=ParseMode.MARKDOWN)
 
 
-def cancel(update, context):
-    user = update.message.from_user
+def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
     logger.info("User %s canceled the conversation.", user.first_name)
-    update.message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
+    update.effective_message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
 
 
 @require_privileges([Privileges.TESTER])
-def test(update, context):
+def test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.bot.send_message(
-        chat_id=update.message.chat_id,
+        chat_id=update.effective_chat.id,
         text="testing",
         reply_markup=ReplyKeyboardMarkup([[str(i)] for i in range(20)], one_time_keyboard=True),
     )
 
 
 @require_access
-def unknown_command(update, context):
-    user = update.message.from_user
-    logger.info(f"{user.username} ({user.id}) typed unknown command: {update.message.text}")
+def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info(f"{user.username} ({user.id}) typed unknown command: {update.effective_message.text}")
     context.bot.send_message(
-        chat_id=update.message.chat_id,
+        chat_id=update.effective_chat.id,
         text="I did not understand that command. Please type /help to see the commands.",
     )
 
 
 @require_access
-def unknown(update, context):
-    user = update.message.from_user
-    logger.info(f"{user.username} ({user.id}) typed unknown text: {update.message.text}")
+def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info(f"{user.username} ({user.id}) typed unknown text: {update.effective_message.text}")
     text = random.choice(  # nosec
         [
             "yo",
@@ -347,8 +487,8 @@ def unknown(update, context):
             "no.",
             "dude, get some /help",
             "stop that",
-            f"toi {update.message.text}",
+            f"toi {update.effective_message.text}",
         ],
     )
 
-    context.bot.send_message(chat_id=update.message.chat_id, text=text)
+    context.bot.send_message(chat_id=update.effective_chat.id, text=text)
