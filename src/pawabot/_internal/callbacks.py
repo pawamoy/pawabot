@@ -331,7 +331,10 @@ def search_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 def reply_torrents(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, torrents: list | None = None, page: int = 1
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    torrents: list | None = None,
+    page: int = 1,
 ) -> None:
     x = (page - 1) * 10
     y = x + 10

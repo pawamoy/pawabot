@@ -12,8 +12,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from __future__ import annotations
-
 # Why does this file exist, and why not put this in `__main__`?
 #
 # You might be tempted to import things from `__main__` later,
@@ -24,6 +22,8 @@ from __future__ import annotations
 #   `pawabot.__main__` in `sys.modules`.
 # - When you import `__main__` it will get executed again (as a module) because
 #   there's no `pawabot.__main__` in `sys.modules`.
+
+from __future__ import annotations
 
 import argparse
 import logging
