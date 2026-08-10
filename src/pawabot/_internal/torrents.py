@@ -1,11 +1,11 @@
 import json
 import re
 
-import requests
+import httpx2
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from .utils import get_cache_dir
+from pawabot._internal.utils import get_cache_dir
 
 CACHE_DIR = get_cache_dir()
 
@@ -91,8 +91,8 @@ class ThePirateBay:
         for mirror_list_page in self.MIRROR_LIST_PAGES:
             try:
                 # logging.info("Fetching mirrors from " + mirror_list_page)
-                html_page = requests.get(mirror_list_page)
-            except requests.ConnectTimeout:
+                html_page = httpx2.get(mirror_list_page)
+            except httpx2.ConnectTimeout:
                 # logging.info("Timeout")
                 continue
             else:
@@ -109,7 +109,7 @@ class ThePirateBay:
     @staticmethod
     def get_search_url(mirror):
         # url/search/PATTERN/PAGE/ORDER/CATEGORY
-        soup = BeautifulSoup(requests.get(mirror, timeout=5).text, features="html.parser")
+        soup = BeautifulSoup(httpx2.get(mirror, timeout=5).text, features="html.parser")
         return f"{mirror}/{soup.form['action'].lstrip('/')}"
 
     def search(self, user_id, pattern, page=1):
@@ -118,19 +118,19 @@ class ThePirateBay:
             if not self.search_urls[i]:
                 try:
                     self.search_urls[i] = self.get_search_url(mirror)
-                except (requests.exceptions.SSLError, TypeError) as error:
+                except (httpx2.ConnectError, TypeError) as error:
                     logger.error(f"Error when requesting home page of {mirror}")
                     logger.opt(exception=True).trace(error)
                     continue
-                except (requests.ConnectTimeout, requests.ReadTimeout):
+                except (httpx2.ConnectTimeout, httpx2.ReadTimeout):
                     logger.info("Timeout")
                     continue
             search_url = self.search_urls[i]
 
             page_param = "&page=" + str(page - 1)
             try:
-                html_page = requests.get(search_url + f"?q={pattern}{page_param}", timeout=5)
-            except (requests.ConnectTimeout, requests.ReadTimeout):
+                html_page = httpx2.get(search_url + f"?q={pattern}{page_param}", timeout=5)
+            except (httpx2.ConnectTimeout, httpx2.ReadTimeout):
                 logger.info("Timeout")
                 continue
 

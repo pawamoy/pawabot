@@ -1,16 +1,29 @@
+# editors
 .idea/
-__pycache__/
-*.py[cod]
-dist/
+.vscode/
+
+# python
 *.egg-info/
-build/
-.coverage*
-pip-wheel-metadata/
-.pytest_cache/
-.mypy_cache/
-site/
-poetry.lock
+*.py[cod]
 .venv/
+.venvs/
+/build/
+/dist/
+
+# tools
+.coverage*
+/.pdm-build/
+/htmlcov/
+/site/
+uv.lock
+
+# cache
+.cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+
+# project-specific
 owner_id.txt
 token.txt
 torrent-search*

@@ -24,8 +24,8 @@ from privibot import callbacks as privcallbacks
 from privibot import init
 from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
-from . import callbacks
-from .utils import get_data_dir
+from pawabot._internal import callbacks
+from pawabot._internal.utils import get_data_dir
 
 DATA_DIR = get_data_dir()
 

@@ -1,37 +1,35 @@
-.DEFAULT_GOAL := help
-SHELL := bash
+# If you have `direnv` loaded in your shell, and allow it in the repository,
+# the `make` command will point at the `scripts/make` shell script.
+# This Makefile is just here to allow auto-completion in the terminal.
 
-INVOKE_OR_POETRY = $(shell ! command -v invoke &>/dev/null && echo poetry run) invoke
-INVOKE_AND_POETRY = $(shell [ ! -n "${VIRTUAL_ENV}" ] && echo poetry run) invoke
+default: help
+	@echo
+	@echo 'Enable direnv in your shell to use the `make` command: `direnv allow`'
+	@echo 'Or use `python scripts/make ARGS` to run the commands/tasks directly.'
 
-POETRY_TASKS = \
+.DEFAULT_GOAL: default
+
+actions = \
+	allrun \
 	changelog \
 	check \
-	check-code-quality \
-	check-dependencies \
+	check-api \
 	check-docs \
+	check-quality \
 	check-types \
-	combine \
+	clean \
 	coverage \
 	docs \
 	docs-deploy \
-	docs-regen \
-	docs-serve \
 	format \
+	help \
+	multirun \
 	release \
-	test
+	run \
+	setup \
+	test \
+	vscode
 
-INVOKE_TASKS = \
-	clean \
-	setup
-
-
-.PHONY: help
-help:
-	@$(INVOKE) --list
-
-$(POETRY_TASKS):
-	@$(INVOKE_AND_POETRY) $@ $(args)
-
-$(INVOKE_TASKS):
-	@$(INVOKE_OR_POETRY) $@ $(args)
+.PHONY: $(actions)
+$(actions):
+	@python scripts/make "$@"

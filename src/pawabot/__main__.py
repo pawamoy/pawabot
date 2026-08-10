@@ -1,5 +1,4 @@
-"""
-Entry-point module, in case you use `python -m pawabot`.
+"""Entry-point module, in case you use `python -m pawabot`.
 
 Why does this file exist, and why `__main__`? For more info, read:
 
@@ -9,7 +8,7 @@ Why does this file exist, and why `__main__`? For more info, read:
 
 import sys
 
-from pawabot.cli import main
+from pawabot._internal.cli import main
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

@@ -13,8 +13,8 @@ from telegram import (  # InlineQueryResultArticle, InputTextMessageContent,
 )
 from telegram.ext import ConversationHandler
 
-from .privileges import Privileges
-from .torrents import TPB, Search
+from pawabot._internal.privileges import Privileges
+from pawabot._internal.torrents import TPB, Search
 
 
 class STATE:
