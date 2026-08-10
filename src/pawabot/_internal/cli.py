@@ -18,11 +18,10 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from privibot import User, init
-from privibot import callbacks as privcallbacks
 from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
 from pawabot._internal import callbacks
+from pawabot._internal.database import User, init
 from pawabot._internal.utils import get_data_dir
 
 DATA_DIR = get_data_dir()
@@ -151,10 +150,10 @@ def main(args: list[str] | None = None) -> int:
         dispatcher.add_handler(CommandHandler("start", callbacks.start))
         dispatcher.add_handler(CommandHandler("help", callbacks.help))
         dispatcher.add_handler(CommandHandler("myID", callbacks.my_id))
-        dispatcher.add_handler(CommandHandler("myPrivileges", privcallbacks.my_privileges))
-        dispatcher.add_handler(CommandHandler("requestAccess", privcallbacks.request_access))
-        dispatcher.add_handler(CommandHandler("grant", privcallbacks.grant, pass_args=True))
-        dispatcher.add_handler(CommandHandler("revoke", privcallbacks.revoke, pass_args=True))
+        dispatcher.add_handler(CommandHandler("myPrivileges", callbacks.my_privileges))
+        dispatcher.add_handler(CommandHandler("requestAccess", callbacks.request_access))
+        dispatcher.add_handler(CommandHandler("grant", callbacks.grant, pass_args=True))
+        dispatcher.add_handler(CommandHandler("revoke", callbacks.revoke, pass_args=True))
 
         handler_search = CommandHandler("search", callbacks.search, pass_args=True)
         handler_search_pattern = MessageHandler(Filters.text, callbacks.search_pattern)

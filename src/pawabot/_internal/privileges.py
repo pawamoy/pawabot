@@ -1,5 +1,5 @@
-from privibot import Privilege
-from privibot import Privileges as Ps
+from pawabot._internal.privilege import Privilege
+from pawabot._internal.privilege import Privileges as Ps
 
 
 class Privileges(Ps):

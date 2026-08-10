@@ -4,7 +4,6 @@ from textwrap import dedent
 
 import aria2p
 from loguru import logger
-from privibot import User, require_access, require_privileges
 from telegram import (  # InlineQueryResultArticle, InputTextMessageContent,
     ChatAction,
     ParseMode,
@@ -13,6 +12,8 @@ from telegram import (  # InlineQueryResultArticle, InputTextMessageContent,
 )
 from telegram.ext import ConversationHandler
 
+from pawabot._internal.database import User
+from pawabot._internal.decorators import require_access, require_privileges
 from pawabot._internal.privileges import Privileges
 from pawabot._internal.torrents import TPB, Search
 
