@@ -30,6 +30,7 @@ CACHE_DIR = get_cache_dir()
 class Torrent:
     def __init__(
         self,
+        *,
         title: str,
         magnet: str,
         url: str,
@@ -70,7 +71,7 @@ class Search:
         self.pages = pages
 
     def save(self) -> None:
-        with open(CACHE_DIR / f"torrent-search-{self.user_id}.json", "w") as fp:
+        with CACHE_DIR.joinpath(f"torrent-search-{self.user_id}.json").open("w") as fp:
             json.dump(
                 {
                     "user_id": self.user_id,
@@ -91,7 +92,7 @@ class Search:
 
     @staticmethod
     def load(user_id: int) -> Search:
-        with open(CACHE_DIR / f"torrent-search-{user_id}.json") as fp:
+        with CACHE_DIR.joinpath(f"torrent-search-{user_id}.json").open() as fp:
             data = json.load(fp)
         return Search(
             data["user_id"],
@@ -103,7 +104,7 @@ class Search:
 
 
 class ThePirateBay:
-    MIRROR_LIST_PAGES = ["https://proxybay.lat", "https://proxybay.github.io"]
+    MIRROR_LIST_PAGES = ("https://proxybay.lat", "https://proxybay.github.io")
 
     def __init__(self, mirrors: list[str] | None = None, limit: int = 5) -> None:
         if not mirrors:
@@ -119,7 +120,7 @@ class ThePirateBay:
             try:
                 # logging.info("Fetching mirrors from " + mirror_list_page)
                 html_page = httpx2.get(mirror_list_page)
-            except httpx2.ConnectTimeout:
+            except httpx2.ConnectTimeout:  # noqa: PERF203
                 # logging.info("Timeout")
                 continue
             else:

@@ -61,7 +61,7 @@ class User(Base):
         return session.query(User).filter(User.username == username).first()
 
     @staticmethod
-    def create(uid: int, username: str | None = None, is_admin: bool = False) -> User:
+    def create(uid: int, username: str | None = None, *, is_admin: bool = False) -> User:
         user = User(uid=uid, username=username or "?", is_admin=is_admin)
         session.add(user)
         session.commit()
@@ -109,7 +109,7 @@ class UserPrivilege(Base):
 
 
 def init(db_path: str = "sqlite:///db.sqlite3") -> Any:
-    global session
+    global session  # noqa: PLW0603
 
     # connection
     engine = create_engine(db_path)

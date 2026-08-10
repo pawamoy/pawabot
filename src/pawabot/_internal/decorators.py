@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+logger = logging.getLogger("pawabot")
+
 
 def _require_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> User:
     db_user = User.get_with_id(update.effective_user.id)
@@ -95,7 +97,7 @@ def require_privileges(privileges: list) -> Callable[[F], F]:
 
 
 def deny_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> None:
-    logging.warning(
+    logger.warning(
         f"Unauthorized access denied for {update.effective_user.username} ({update.effective_user.id}) "
         f"on function {func_name}",
     )

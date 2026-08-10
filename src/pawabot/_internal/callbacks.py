@@ -146,7 +146,7 @@ def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_user = update.effective_user
     logger.info(f"{tg_user.username} ({tg_user.id}) called /grant")
 
-    if not context.args or len(context.args) != 2:
+    if not context.args or len(context.args) != 2:  # noqa: PLR2004
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Usage is /grant <ID_OR_USERNAME> <PERMISSION>",
@@ -193,7 +193,7 @@ def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 @require_admin
 def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not context.args or len(context.args) != 2:
+    if not context.args or len(context.args) != 2:  # noqa: PLR2004
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Usage is /revoke <ID_OR_USERNAME> <PERMISSION>",
@@ -343,7 +343,7 @@ def reply_torrents(
     keyboard_buttons = [[], []]
 
     for i, torrent in enumerate(torrents[x:y], 1):
-        keyboard_buttons[0 if i <= 5 else 1].append(str(i + x))
+        keyboard_buttons[0 if i <= 5 else 1].append(str(i + x))  # noqa: PLR2004
         reply_text.append(
             f"*#{i + x} - {torrent.title}*\n  {torrent.seeders}/{torrent.leechers}  {torrent.size}  {torrent.date}\n\n",
         )
@@ -433,9 +433,7 @@ def parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if db_user.is_admin or db_user.has_perm("can_auto_download"):
         api = aria2p.API()
-        downloads = []
-        for magnet in magnets:
-            downloads.append(api.add_magnet(magnet))
+        downloads = [api.add_magnet(magnet) for magnet in magnets]
         reply += "The new downloads are: \n\n"
         for d in downloads:
             reply += f"*{d.name}* (gid: {d.gid}, status: {d.status})\n\n"
@@ -447,7 +445,7 @@ def parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.bot.send_message(chat_id=update.effective_chat.id, text=reply, parse_mode=ParseMode.MARKDOWN)
 
 
-def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:  # noqa: ARG001
     user = update.effective_user
     logger.info("User %s canceled the conversation.", user.first_name)
     update.effective_message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
@@ -476,7 +474,7 @@ def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info(f"{user.username} ({user.id}) typed unknown text: {update.effective_message.text}")
-    text = random.choice(  # nosec
+    text = random.choice(  # noqa: S311
         [
             "yo",
             "wassup",

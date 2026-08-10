@@ -15,7 +15,6 @@
 """Tests for the `cli` module."""
 
 import pytest
-from pytest import CaptureFixture
 
 from pawabot import cli
 
@@ -25,7 +24,7 @@ def test_main() -> None:
     assert cli.main([]) == 0
 
 
-def test_show_help(capsys: CaptureFixture[str]) -> None:
+def test_show_help(capsys: pytest.CaptureFixture[str]) -> None:
     """Shows help.
 
     Arguments:

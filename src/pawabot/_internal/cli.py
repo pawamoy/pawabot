@@ -205,7 +205,7 @@ def main(args: list[str] | None = None) -> int:
         app.add_handler(MessageHandler(filters.COMMAND, callbacks.unknown_command))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks.unknown))
 
-        logging.info("Starting Bot")
+        logger.info("Starting Bot")
         app.run_polling()
 
         return 0
