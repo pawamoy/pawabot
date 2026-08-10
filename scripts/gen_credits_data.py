@@ -7,12 +7,11 @@ from pathlib import Path
 
 import httpx
 import toml
-from pip._internal.commands.show import search_packages_info  # noqa: WPS436 (better way?)
+from pip._internal.commands.show import search_packages_info
 
 
 def clean_info(package_dict: dict) -> dict:
-    """
-    Only keep `name` and `home-page` keys.
+    """Only keep `name` and `home-page` keys.
 
     Arguments:
         package_dict: Package information.
@@ -24,8 +23,7 @@ def clean_info(package_dict: dict) -> dict:
 
 
 def get_data() -> dict:
-    """
-    Return data used to generate the credits file.
+    """Return data used to generate the credits file.
 
     Returns:
         Data required to render the credits template.
@@ -46,7 +44,7 @@ def get_data() -> dict:
     dependencies = direct_dependencies + indirect_dependencies
     packages = {pkg["name"]: clean_info(pkg) for pkg in search_packages_info(dependencies)}
     # poetry.lock seems to always use lowercase for packages names
-    packages.update({name.lower(): pkg for name, pkg in packages.items()})  # noqa: WPS221 (not that complex)
+    packages.update({name.lower(): pkg for name, pkg in packages.items()})
 
     for dependency in dependencies:
         if dependency not in packages:
@@ -65,13 +63,12 @@ def get_data() -> dict:
 
 
 def main() -> int:
-    """
-    Dump data as JSON.
+    """Dump data as JSON.
 
     Returns:
         An exit code.
     """
-    print(json.dumps(get_data()))  # noqa: WPS421 (side-effect)
+    print(json.dumps(get_data()))
     return 0
 
 

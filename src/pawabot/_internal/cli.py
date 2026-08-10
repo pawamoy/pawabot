@@ -16,12 +16,10 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 from loguru import logger
-from privibot import User
+from privibot import User, init
 from privibot import callbacks as privcallbacks
-from privibot import init
 from telegram.ext import CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
 from pawabot._internal import callbacks
@@ -31,8 +29,7 @@ DATA_DIR = get_data_dir()
 
 
 def get_parser() -> argparse.ArgumentParser:
-    """
-    Return the CLI argument parser.
+    """Return the CLI argument parser.
 
     Returns:
         An argparse parser.
@@ -83,9 +80,8 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(args: Optional[List[str]] = None) -> int:
-    """
-    Run the main program.
+def main(args: list[str] | None = None) -> int:
+    """Run the main program.
 
     This function is executed when you type `pawabot` or `python -m pawabot`.
 
@@ -116,8 +112,8 @@ def main(args: Optional[List[str]] = None) -> int:
                 "sink": sys.stdout,
                 "format": "{time:YYYY-MM-DD HH:mm:ss.SSS} | <lvl>{level:<8}</lvl> | {message}",
                 "level": log_level,
-            }
-        ]
+            },
+        ],
     )
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
@@ -129,10 +125,10 @@ def main(args: Optional[List[str]] = None) -> int:
     if args.subcommand == "create-admin":
         User.create(uid=args.uid, username=args.username, is_admin=True)
         return 0
-    elif args.subcommand == "create-user":
+    if args.subcommand == "create-user":
         User.create(uid=args.uid, username=args.username, is_admin=args.admin)
         return 0
-    elif args.subcommand == "list-users":
+    if args.subcommand == "list-users":
         print(f"{'ID':>10}  {'USERNAME':<20}  ADMIN")
         print("---------------------------------------")
         for user in User.all():
@@ -142,8 +138,7 @@ def main(args: Optional[List[str]] = None) -> int:
     # elif args.subcommand == "delete-users":
     #     for uid in args.uids:
     #         User
-    elif args.subcommand == "run":
-
+    if args.subcommand == "run":
         if "BOT_TOKEN" in os.environ:
             bot_token = os.environ.get("BOT_TOKEN")
         else:
@@ -173,7 +168,7 @@ def main(args: Optional[List[str]] = None) -> int:
                     callbacks.STATE.SEARCH.SELECT: [handler_search_select],
                 },
                 fallbacks=[CommandHandler("cancel", callbacks.cancel)],
-            )
+            ),
         )
 
         dispatcher.add_handler(handler_search)
@@ -195,6 +190,5 @@ def main(args: Optional[List[str]] = None) -> int:
 
         return 0
 
-    else:
-        print(parser.format_help(), file=sys.stderr)
-        return 1
+    print(parser.format_help(), file=sys.stderr)
+    return 1

@@ -2,7 +2,7 @@
 
 import re
 import sys
-from typing import List, Optional, Pattern
+from re import Pattern
 
 import httpx
 from git_changelog.build import Changelog, Version
@@ -12,9 +12,8 @@ TEMPLATE_URL = "https://raw.githubusercontent.com/pawamoy/jinja-templates/master
 COMMIT_STYLE = "angular"
 
 
-def latest(lines: List[str], regex: Pattern) -> Optional[str]:
-    """
-    Return the last released version.
+def latest(lines: list[str], regex: Pattern) -> str | None:
+    """Return the last released version.
 
     Arguments:
         lines: Lines of the changelog file.
@@ -30,9 +29,8 @@ def latest(lines: List[str], regex: Pattern) -> Optional[str]:
     return None
 
 
-def unreleased(versions: List[Version], last_release: str) -> List[Version]:
-    """
-    Return the most recent versions down to latest release.
+def unreleased(versions: list[Version], last_release: str) -> list[Version]:
+    """Return the most recent versions down to latest release.
 
     Arguments:
         versions: All the versions (released and unreleased).
@@ -47,9 +45,8 @@ def unreleased(versions: List[Version], last_release: str) -> List[Version]:
     return versions
 
 
-def read_changelog(filepath: str) -> List[str]:
-    """
-    Read the changelog file.
+def read_changelog(filepath: str) -> list[str]:
+    """Read the changelog file.
 
     Arguments:
         filepath: The path to the changelog file.
@@ -57,13 +54,12 @@ def read_changelog(filepath: str) -> List[str]:
     Returns:
         The changelog lines.
     """
-    with open(filepath, "r") as changelog_file:
+    with open(filepath) as changelog_file:
         return changelog_file.read().splitlines(keepends=False)
 
 
-def write_changelog(filepath: str, lines: List[str]) -> None:
-    """
-    Write the changelog file.
+def write_changelog(filepath: str, lines: list[str]) -> None:
+    """Write the changelog file.
 
     Arguments:
         filepath: The path to the changelog file.
@@ -74,8 +70,7 @@ def write_changelog(filepath: str, lines: List[str]) -> None:
 
 
 def update_changelog(inplace_file: str, marker: str, version_regex: str) -> None:
-    """
-    Update the given changelog file in place.
+    """Update the given changelog file in place.
 
     Arguments:
         inplace_file: The file to update in-place.
@@ -104,8 +99,7 @@ def update_changelog(inplace_file: str, marker: str, version_regex: str) -> None
 
 
 def main(args):
-    """
-    Run the main script.
+    """Run the main script.
 
     Arguments:
         args: Arguments passed from the command line.
@@ -114,7 +108,7 @@ def main(args):
         An exit code.
     """
     if len(args) != 3:
-        print(  # noqa: WPS421 (side-effect)
+        print(
             "usage: update_changelog.py <FILE> <MARKER> <VERSION_REGEX>",
             file=sys.stderr,
         )

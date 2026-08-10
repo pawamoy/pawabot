@@ -59,12 +59,12 @@ class Search:
         if self.proxy != search.proxy or self.pattern != search.pattern or self.user_id != search.user_id:
             raise ValueError
         self.results.extend(search.results)
-        self.pages = list(sorted(set(self.pages + search.pages)))
+        self.pages = sorted(set(self.pages + search.pages))
         self.save()
 
     @staticmethod
     def load(user_id):
-        with open(CACHE_DIR / f"torrent-search-{user_id}.json", "r") as fp:
+        with open(CACHE_DIR / f"torrent-search-{user_id}.json") as fp:
             data = json.load(fp)
         return Search(
             data["user_id"],
@@ -154,13 +154,12 @@ class ThePirateBay:
                         date=extra[0][len("Uploaded ") :],
                         size=extra[1][len("Size ") :],
                         uploader=extra[2][len("ULed by ") :],
-                    )
+                    ),
                 )
 
             if torrents:
                 return Search(user_id, mirror, pattern, torrents, [page])
-            else:
-                logger.info("No results")
+            logger.info("No results")
 
         raise LookupError
 

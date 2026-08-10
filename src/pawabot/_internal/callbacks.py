@@ -35,7 +35,7 @@ def start(update, context):
 
             Sorry, but you have not been granted access to my commands.
             Please contact my administrator.
-            """
+            """,
         )
     else:
         text = dedent(
@@ -48,7 +48,7 @@ def start(update, context):
             you don't mind me sending you a few messages sometimes!
 
             Type the command /help to learn how to use my commands!
-            """
+            """,
         )
 
     context.bot.send_message(chat_id=update.message.chat_id, text=text)
@@ -68,7 +68,7 @@ def help(update, context):
         /search - To search on The Pirate Bay.
         /grant - To grant a permission to a user.
         /revoke - To revoke a permission to a user.
-    """
+    """,
     )
 
     context.bot.send_message(chat_id=update.message.chat_id, text=text, parse_mode=ParseMode.MARKDOWN)
@@ -141,7 +141,7 @@ def search_select(update, context):
     if message.endswith("+"):
         last = int(message[:-1])
         page = last // 10
-        logger.info(f"{user.username} ({user.id}) asked to see page {page+1} during /search conversation")
+        logger.info(f"{user.username} ({user.id}) asked to see page {page + 1} during /search conversation")
 
         if last >= len(s.results):
             s.update(TPB.search(s.user_id, s.pattern, s.pages[-1] + 1))
@@ -160,12 +160,14 @@ def search_select(update, context):
         logger.info(f"torrent '{download.name}' (gid: {download.gid}) was added to aria2")
     else:
         reply = (
-            f"A download request has been sent to an administrator. "
-            f"You will get a notification when they processed it."
+            "A download request has been sent to an administrator. You will get a notification when they processed it."
         )
 
     context.bot.send_message(
-        chat_id=update.message.chat_id, text=reply, reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.MARKDOWN
+        chat_id=update.message.chat_id,
+        text=reply,
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode=ParseMode.MARKDOWN,
     )
 
     return ConversationHandler.END
@@ -181,8 +183,7 @@ def reply_torrents(update, context, torrents, page=1):
     for i, torrent in enumerate(torrents[x:y], 1):
         keyboard_buttons[0 if i <= 5 else 1].append(str(i + x))
         reply_text.append(
-            f"*#{i+x} - {torrent.title}*\n"
-            f"  {torrent.seeders}/{torrent.leechers}  {torrent.size}  {torrent.date}\n\n"
+            f"*#{i + x} - {torrent.title}*\n  {torrent.seeders}/{torrent.leechers}  {torrent.size}  {torrent.date}\n\n",
         )
 
     third_row = ["Cancel"]
@@ -284,8 +285,7 @@ def parse_magnet(update, context):
             reply += f"*{d.name}* (gid: {d.gid}, status: {d.status})\n\n"
     else:
         reply += (
-            "You must now wait for the administrator to accept them.\n"
-            "You will receive a notification when it's done!"
+            "You must now wait for the administrator to accept them.\nYou will receive a notification when it's done!"
         )
 
     context.bot.send_message(chat_id=update.message.chat_id, text=reply, parse_mode=ParseMode.MARKDOWN)
@@ -311,7 +311,8 @@ def unknown_command(update, context):
     user = update.message.from_user
     logger.info(f"{user.username} ({user.id}) typed unknown command: {update.message.text}")
     context.bot.send_message(
-        chat_id=update.message.chat_id, text="I did not understand that command. Please type /help to see the commands."
+        chat_id=update.message.chat_id,
+        text="I did not understand that command. Please type /help to see the commands.",
     )
 
 
@@ -332,7 +333,7 @@ def unknown(update, context):
             "dude, get some /help",
             "stop that",
             f"toi {update.message.text}",
-        ]
+        ],
     )
 
     context.bot.send_message(chat_id=update.message.chat_id, text=text)

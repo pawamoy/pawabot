@@ -21,6 +21,8 @@ class Privileges(Ps):
         "This privilege allows users to act (accept or reject) on media-related requests.",
     )
     USER_MANAGER = Privilege(
-        "user_manager", "User Manager", "This privilege allows users to manage access of other users to the bot."
+        "user_manager",
+        "User Manager",
+        "This privilege allows users to manage access of other users to the bot.",
     )
     TESTER = Privilege("tester", "Tester", "This privilege allows users to test new things.")

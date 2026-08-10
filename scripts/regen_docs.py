@@ -12,15 +12,14 @@ REGEN = (("docs/credits.md", get_credits, URL_PREFIX + "credits.md"),)
 
 
 def main() -> int:
-    """
-    Regenerate pages listed in global `REGEN` list.
+    """Regenerate pages listed in global `REGEN` list.
 
     Returns:
         An exit code.
     """
     env = SandboxedEnvironment(undefined=StrictUndefined)
     for target, get_data, template in REGEN:
-        print("Regenerating", target)  # noqa: WPS421 (side-effect in main is fine)
+        print("Regenerating", target)
         template_data = get_data()
         template_text = httpx.get(template).text
         rendered = env.from_string(template_text).render(**template_data)
