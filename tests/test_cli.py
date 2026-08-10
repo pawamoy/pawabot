@@ -16,7 +16,7 @@
 
 import pytest
 
-from pawabot import cli
+from pawabot._internal import cli
 
 
 def test_main() -> None:

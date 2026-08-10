@@ -72,7 +72,7 @@ def get_parser() -> argparse.ArgumentParser:
     # )
 
     def create_subparser(command: str, text: str, **kwargs: object) -> argparse.ArgumentParser:
-        sub = subparsers.add_parser(command, add_help=False, help=text, description=text, **kwargs)
+        sub = subparsers.add_parser(command, add_help=False, help=text, description=text, **kwargs)  # ty:ignore[invalid-argument-type]
         sub.add_argument("-h", "--help", action="help", help=subcommand_help)
         return sub
 
@@ -99,21 +99,21 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(args: list[str] | None = None) -> int:
+def main(cmd_args: list[str] | None = None) -> int:
     """Run the main program.
 
     This function is executed when you type `pawabot` or `python -m pawabot`.
 
     Arguments:
-        args: Arguments passed from the command line.
+        cmd_args: Arguments passed from the command line.
 
     Returns:
         An exit code.
     """
     parser = get_parser()
-    args = parser.parse_args(args=args)
+    args = parser.parse_args(args=cmd_args)
 
-    def log_level_to_name(level: int) -> str:
+    def log_level_to_name(level: int) -> str | None:
         for log_name in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             if level == getattr(logging, log_name):
                 return log_name
@@ -123,7 +123,9 @@ def main(args: list[str] | None = None) -> int:
         def emit(self, record: logging.LogRecord) -> None:
             # Retrieve context where the logging call occurred, this happens to be in the 6th frame upward
             logger_opt = logger.opt(depth=6, exception=record.exc_info)
-            logger_opt.log(log_level_to_name(record.levelno), record.getMessage())
+            log_name = log_level_to_name(record.levelno)
+            if log_name is not None:
+                logger_opt.log(log_name, record.getMessage())
 
     log_level = args.log_level
     logger.configure(
@@ -139,13 +141,23 @@ def main(args: list[str] | None = None) -> int:
 
     init(db_path="sqlite:///" + str(DATA_DIR / "db.sqlite3"))
 
+    if args.subcommand is None:
+        print(parser.format_help(), file=sys.stderr)
+        return 1
+
     # with open("owner_id.txt") as stream:
     #     OWNER_ID = stream.read().rstrip("\n")
 
     if args.subcommand == "create-admin":
+        if args.uid is None or args.username is None:
+            print("Error: --uid and --username are required", file=sys.stderr)
+            return 1
         User.create(uid=args.uid, username=args.username, is_admin=True)
         return 0
     if args.subcommand == "create-user":
+        if args.uid is None or args.username is None:
+            print("Error: --uid and --username are required", file=sys.stderr)
+            return 1
         User.create(uid=args.uid, username=args.username, is_admin=args.admin)
         return 0
     if args.subcommand == "list-users":
@@ -165,6 +177,10 @@ def main(args: list[str] | None = None) -> int:
             with (Path.home() / ".config" / "pawabot" / "bot_token.txt").open() as stream:
                 bot_token = stream.read().rstrip("\n")
 
+        if bot_token is None:
+            print("Error: BOT_TOKEN environment variable is not set", file=sys.stderr)
+            return 1
+
         app = ApplicationBuilder().token(bot_token).build()
 
         app.add_handler(CommandHandler("start", callbacks.start))
@@ -172,8 +188,8 @@ def main(args: list[str] | None = None) -> int:
         app.add_handler(CommandHandler("myID", callbacks.my_id))
         app.add_handler(CommandHandler("myPrivileges", callbacks.my_privileges))
         app.add_handler(CommandHandler("requestAccess", callbacks.request_access))
-        app.add_handler(CommandHandler("grant", callbacks.grant))
-        app.add_handler(CommandHandler("revoke", callbacks.revoke))
+        app.add_handler(CommandHandler("grant", callbacks.grant))  # ty:ignore[invalid-argument-type]
+        app.add_handler(CommandHandler("revoke", callbacks.revoke))  # ty:ignore[invalid-argument-type]
 
         handler_search = CommandHandler("search", callbacks.search)
         handler_search_pattern = MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks.search_pattern)
@@ -184,8 +200,8 @@ def main(args: list[str] | None = None) -> int:
 
         app.add_handler(
             ConversationHandler(
-                entry_points=[handler_search],
-                states={
+                entry_points=[handler_search],  # ty:ignore
+                states={  # ty:ignore
                     callbacks.STATE.SEARCH.PATTERN: [handler_search_pattern],
                     callbacks.STATE.SEARCH.SELECT: [handler_search_select],
                 },

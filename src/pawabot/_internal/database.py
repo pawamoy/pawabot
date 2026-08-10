@@ -27,10 +27,10 @@ session = None
 class User(Base):
     __tablename__ = "user"
 
-    id = Column(Integer, primary_key=True)
-    uid = Column(Integer, unique=True, nullable=False)
-    username = Column(String(255), unique=True, nullable=False)
-    is_admin = Column(Boolean, default=False)
+    id: int = Column(Integer, primary_key=True)  # ty:ignore[invalid-assignment]
+    uid: int = Column(Integer, unique=True, nullable=False)  # ty:ignore[invalid-assignment]
+    username: str = Column(String(255), unique=True, nullable=False)  # ty:ignore[invalid-assignment]
+    is_admin: bool = Column(Boolean, default=False)  # ty:ignore[invalid-assignment]
 
     privileges = relationship("UserPrivilege", back_populates="user")
 
@@ -39,6 +39,8 @@ class User(Base):
 
     @staticmethod
     def all() -> list[User]:
+        if session is None:
+            return []
         return list(session.query(User))
 
     @staticmethod
@@ -54,14 +56,20 @@ class User(Base):
 
     @staticmethod
     def get_with_id(uid: int) -> User | None:
-        return session.query(User).filter(User.uid == uid).first()
+        if session is None:
+            return None
+        return session.query(User).filter(User.uid == uid).first()  # ty:ignore[invalid-argument-type]
 
     @staticmethod
     def get_with_username(username: str) -> User | None:
-        return session.query(User).filter(User.username == username).first()
+        if session is None:
+            return None
+        return session.query(User).filter(User.username == username).first()  # ty:ignore[invalid-argument-type]
 
     @staticmethod
     def create(uid: int, username: str | None = None, *, is_admin: bool = False) -> User:
+        if session is None:
+            raise RuntimeError("Database not initialized")
         user = User(uid=uid, username=username or "?", is_admin=is_admin)
         session.add(user)
         session.commit()
@@ -80,17 +88,23 @@ class User(Base):
         return None
 
     def grant(self, privilege: Any) -> bool:
+        if session is None:
+            raise RuntimeError("Database not initialized")
         session.add(UserPrivilege(user_id=self.uid, privilege=privilege.name))
         session.commit()
         return True
 
     def revoke(self, privilege: Any) -> bool:
+        if session is None:
+            raise RuntimeError("Database not initialized")
         session.delete(self.get_privilege(privilege))
         session.commit()
         return True
 
 
 def save() -> None:
+    if session is None:
+        raise RuntimeError("Database not initialized")
     session.commit()
 
 

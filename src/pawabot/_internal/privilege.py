@@ -27,8 +27,8 @@ class Privilege:
 class _PrivilegesMetaclass(type):
     mapping_name = "__privilege_mapping__"
 
-    def __new__(mcs: type, cls: str, bases: tuple, dct: dict[str, Any]) -> type:  # type: ignore[override]
-        super_new = super().__new__
+    def __new__(mcs: type, cls: str, bases: tuple, dct: dict[str, Any]) -> type:
+        super_new = super().__new__  # ty:ignore
 
         mapping = {}
 
@@ -44,4 +44,4 @@ class _PrivilegesMetaclass(type):
 class Privileges(metaclass=_PrivilegesMetaclass):
     @classmethod
     def get(cls, privilege_name: str) -> Privilege | None:
-        return cls.__getattribute__(_PrivilegesMetaclass.mapping_name).get(privilege_name)
+        return cls.__getattribute__(_PrivilegesMetaclass.mapping_name).get(privilege_name)  # ty:ignore

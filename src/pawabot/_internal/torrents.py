@@ -130,15 +130,21 @@ class ThePirateBay:
             raise LookupError
 
         soup = BeautifulSoup(html_page.text, features="html.parser")
-        rows = soup.find(id="proxyList").find_all("tr")[1:]
+        rows = soup.find(id="proxyList").find_all("tr")[1:]  # ty:ignore
 
-        return [row.find("a")["href"] for row in rows]
+        return [row.find("a")["href"] for row in rows]  # ty:ignore
 
     @staticmethod
     def get_search_url(mirror: str) -> str:
         # url/search/PATTERN/PAGE/ORDER/CATEGORY
         soup = BeautifulSoup(httpx2.get(mirror, timeout=5).text, features="html.parser")
-        return f"{mirror}/{soup.form['action'].lstrip('/')}"
+        form = soup.form
+        if form is None:
+            return mirror
+        action = form.get("action", "")
+        if isinstance(action, str):
+            return f"{mirror}/{action.lstrip('/')}"
+        return mirror
 
     def search(self, user_id: int, pattern: str, page: int = 1) -> Search:
         for i, mirror in enumerate(self.mirrors):
@@ -170,13 +176,13 @@ class ThePirateBay:
             for row in rows:
                 link = row.find("a", class_="detLink")
                 seeders, leechers = [int(td.text) for td in row.find_all("td")[2:]]
-                extra = row.font.text.split(", ")
+                extra = row.font.text.split(", ")  # ty:ignore
 
                 torrents.append(
                     Torrent(
-                        title=link.text,
-                        magnet=row.find("a", href=re.compile(r"^magnet:\?"))["href"],
-                        url=mirror + "/" + link["href"].lstrip("/"),
+                        title=link.text,  # ty:ignore
+                        magnet=row.find("a", href=re.compile(r"^magnet:\?"))["href"],  # ty:ignore
+                        url=mirror + "/" + link["href"].lstrip("/"),  # ty:ignore
                         seeders=seeders,
                         leechers=leechers,
                         date=extra[0][len("Uploaded ") :],
