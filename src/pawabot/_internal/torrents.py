@@ -49,16 +49,16 @@ class Torrent:
         self.uploader = uploader
 
     def as_dict(self) -> dict[str, Any]:
-        return dict(
-            title=self.title,
-            magnet=self.magnet,
-            url=self.url,
-            seeders=self.seeders,
-            leechers=self.leechers,
-            date=self.date,
-            size=self.size,
-            uploader=self.uploader,
-        )
+        return {
+            "title": self.title,
+            "magnet": self.magnet,
+            "url": self.url,
+            "seeders": self.seeders,
+            "leechers": self.leechers,
+            "date": self.date,
+            "size": self.size,
+            "uploader": self.uploader,
+        }
 
 
 class Search:

@@ -17,12 +17,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
-
-from telegram import Update
-from telegram.ext import ContextTypes
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from pawabot._internal.database import User, save
+
+if TYPE_CHECKING:
+    from telegram import Update
+    from telegram.ext import ContextTypes
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -82,10 +83,9 @@ def require_privileges(privileges: list) -> Callable[[F], F]:
                 return None
 
             # permissions check are for basic users only: skip for admins
-            if not db_user.is_admin:
-                if not db_user.has_privileges(privileges):
-                    deny_access(update, context, func.__name__)
-                    return None
+            if not db_user.is_admin and not db_user.has_privileges(privileges):
+                deny_access(update, context, func.__name__)
+                return None
 
             return func(update, context, *args, **kwargs)
 

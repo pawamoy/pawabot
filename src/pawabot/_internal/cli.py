@@ -117,6 +117,7 @@ def main(args: list[str] | None = None) -> int:
         for log_name in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             if level == getattr(logging, log_name):
                 return log_name
+        return None
 
     class InterceptHandler(logging.Handler):
         def emit(self, record: logging.LogRecord) -> None:

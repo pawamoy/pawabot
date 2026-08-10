@@ -349,10 +349,7 @@ def reply_torrents(
         )
 
     third_row = ["Cancel"]
-    if keyboard_buttons[1]:
-        last = keyboard_buttons[1][-1]
-    else:
-        last = keyboard_buttons[0][-1]
+    last = keyboard_buttons[1][-1] if keyboard_buttons[1] else keyboard_buttons[0][-1]
     if len(torrents) > y or len(torrents) % 30 == 0:
         third_row.insert(0, last + "+")
 
@@ -432,10 +429,7 @@ def parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     magnets = re.findall(MAGNET_RE, update.effective_message.text)
 
-    if len(magnets) == 1:
-        reply = "I got your magnet, thanks.\n"
-    else:
-        reply = f"I got your {len(magnets)} magnets, thanks.\n"
+    reply = "I got your magnet, thanks.\n" if len(magnets) == 1 else f"I got your {len(magnets)} magnets, thanks.\n"
 
     if db_user.is_admin or db_user.has_perm("can_auto_download"):
         api = aria2p.API()

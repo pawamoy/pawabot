@@ -32,7 +32,7 @@ class _PrivilegesMetaclass(type):
 
         mapping = {}
 
-        for variable_name, variable in dct.items():
+        for variable in dct.values():
             if isinstance(variable, Privilege):
                 mapping[variable.name] = variable
 

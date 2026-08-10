@@ -68,10 +68,10 @@ class User(Base):
         return user
 
     def has_privilege(self, privilege: Any) -> bool:
-        return privilege.name in set(up.privilege for up in self.privileges)
+        return privilege.name in {up.privilege for up in self.privileges}
 
     def has_privileges(self, privileges: list) -> bool:
-        return set(p.name for p in privileges).issubset(set(up.privilege for up in self.privileges))
+        return {p.name for p in privileges}.issubset({up.privilege for up in self.privileges})
 
     def get_privilege(self, privilege: Any) -> Any | None:
         for up in self.privileges:
