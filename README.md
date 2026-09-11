@@ -60,6 +60,7 @@ Commands:
 - [`create-user`](#create-user)
 - [`list-users`](#list-users)
 - [`run`](#run)
+- [`search`](#search)
 
 ### `create-admin`
 
@@ -111,3 +112,29 @@ Run the bot.
 optional arguments:
   -h, --help  Show this help message and exit.
 ```
+
+### `search`
+
+```
+/search <movie name>
+/search <imdb_id>            (e.g. /search tt1254207)
+/cancel
+```
+
+In Telegram, search for a movie, choose its number, then choose a torrent to download with aria2. Results show release quality, seeders and size when available. Use Next/Previous to browse torrents, `/cancel` to leave, or `/search` to start again. Only movies are supported.
+
+Title search tries OMDb when `OMDB_API_KEY` is set, then TMDB when `TMDB_API_KEY` is set, and finally Cinemeta (no API key needed). TMDB IMDb IDs are resolved only after selecting a movie. Searching by IMDb ID skips title lookup.
+
+Torrentio uses its public Stremio JSON interface; no Stremio installation or debrid account is required. Set `TORRENTIO_BASE_URL` to override its base URL (default: `https://torrentio.strem.fun`, without `/manifest.json`). The endpoint must return raw torrent streams; HTTP/debrid-only results are not downloadable through this search flow. Provider failures are reported separately from empty results.
+
+Searching requires the Downloader privilege. Starting a download additionally requires Verified Downloader, or administrator access. The bot preserves Torrentio's file selection for movies inside multi-file torrents. Administrator approval requests are not implemented; users without Verified Downloader must ask an administrator for access.
+
+The implementation is grouped under `src/pawabot/_internal/search/`:
+
+- `__init__.py`: the search entry points and metadata-provider fallback order used by the bot.
+- `models.py`: shared movie and torrent data.
+- `metadata.py`: OMDb, TMDB, and Cinemeta clients, including IMDb ID resolution.
+- `torrentio.py`: Torrentio requests and conversion of stream responses into torrents.
+- `_http.py`: shared JSON requests, response validation, and provider errors.
+
+Telegram conversations and the aria2 download handoff live in `callbacks.py`.

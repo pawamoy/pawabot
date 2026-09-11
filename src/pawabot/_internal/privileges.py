@@ -12,31 +12,55 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from pawabot._internal.privilege import Privilege
-from pawabot._internal.privilege import Privileges as Ps
+from __future__ import annotations
 
 
-class Privileges(Ps):
-    DOWNLOADER = Privilege(
+class _Privilege:
+    """A named permission with a display name and description."""
+
+    def __init__(self, name: str, verbose_name: str, description: str) -> None:
+        """Initialize the privilege's identifier and display information."""
+        self.name = name
+        self.verbose_name = verbose_name
+        self.description = description
+
+
+class _Privileges:
+    """Container for privileges."""
+
+    DOWNLOADER = _Privilege(
         "downloader",
         "Downloader",
         "This privilege allows users to request downloads, either through a search or by sending a magnet to the bot. "
         "Another privilege, 'Verified Downloader', allows users to automatically start downloads "
         "without requiring validation by administrators.",
     )
-    VERIFIED_DOWNLOADER = Privilege(
+    """Downloaded privilege."""
+    VERIFIED_DOWNLOADER = _Privilege(
         "verified_downloader",
         "Verified Downloader",
         "This privilege allows users to automatically start downloads without requiring validation by administrators.",
     )
-    MEDIA_MANAGER = Privilege(
+    """Verified downloaded privilege."""
+    MEDIA_MANAGER = _Privilege(
         "media_manager",
         "Media Manager",
         "This privilege allows users to act (accept or reject) on media-related requests.",
     )
-    USER_MANAGER = Privilege(
+    """Media manager privilege."""
+    USER_MANAGER = _Privilege(
         "user_manager",
         "User Manager",
         "This privilege allows users to manage access of other users to the bot.",
     )
-    TESTER = Privilege("tester", "Tester", "This privilege allows users to test new things.")
+    """User manager privilege."""
+    TESTER = _Privilege("tester", "Tester", "This privilege allows users to test new things.")
+    """Tester privilege."""
+
+    @classmethod
+    def get(cls, privilege_name: str) -> _Privilege | None:
+        """Return a privilege by its identifier, or None if it is unknown."""
+        for value in vars(cls).values():
+            if isinstance(value, _Privilege) and value.name == privilege_name:
+                return value
+        return None

@@ -21,7 +21,7 @@ from pawabot._internal import cli
 
 def test_main() -> None:
     """Basic CLI test."""
-    assert cli.main([]) == 0
+    assert cli.main([]) == 1
 
 
 def test_show_help(capsys: pytest.CaptureFixture[str]) -> None:

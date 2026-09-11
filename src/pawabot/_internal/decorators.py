@@ -19,41 +19,41 @@ from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from pawabot._internal.database import User, save
+from pawabot._internal.database import _save, _User
 
 if TYPE_CHECKING:
     from telegram import Update
     from telegram.ext import ContextTypes
 
-F = TypeVar("F", bound=Callable[..., Any])
+_F = TypeVar("_F", bound=Callable[..., Any])
 
-logger = logging.getLogger("pawabot")
+_logger = logging.getLogger("pawabot")
 
 
-async def _require_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> User:
+async def _check_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> _User:
     effective_user = update.effective_user
     if effective_user is None:
         raise PermissionError
-    db_user = User.get_with_id(effective_user.id)
+    db_user = _User.get_with_id(effective_user.id)
 
     # user does not have access to the bot
     if not db_user:
-        await deny_access(update, context, func_name)
+        await _deny_access(update, context, func_name)
         raise PermissionError
 
     # update the username if it has changed
     if db_user.username != effective_user.username:
         db_user.username = effective_user.username  # ty:ignore
-        save()
+        _save()
 
     return db_user
 
 
-def require_access(func: F) -> F:
+def _require_access(func: _F) -> _F:
     @wraps(func)
     async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args: Any, **kwargs: Any) -> Any:
         try:
-            await _require_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
+            await _check_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
         except PermissionError:
             return None
 
@@ -62,34 +62,34 @@ def require_access(func: F) -> F:
     return wrapped  # ty:ignore[invalid-return-type]
 
 
-async def require_admin(func: F) -> F:
+def _require_admin(func: _F) -> _F:
     @wraps(func)
     async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args: Any, **kwargs: Any) -> Any:
         try:
-            db_user = await _require_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
+            db_user = await _check_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
         except PermissionError:
             return None
 
         if not db_user.is_admin:
-            await deny_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
+            await _deny_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
 
         return await func(update, context, *args, **kwargs)
 
     return wrapped  # ty:ignore[invalid-return-type]
 
 
-def require_privileges(privileges: list) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
+def _require_privileges(privileges: list) -> Callable[[_F], _F]:
+    def decorator(func: _F) -> _F:
         @wraps(func)
         async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args: Any, **kwargs: Any) -> Any:
             try:
-                db_user = await _require_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
+                db_user = await _check_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
             except PermissionError:
                 return None
 
             # permissions check are for basic users only: skip for admins
             if not db_user.is_admin and not db_user.has_privileges(privileges):
-                await deny_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
+                await _deny_access(update, context, func.__name__)  # ty:ignore[unresolved-attribute]
                 return None
 
             return await func(update, context, *args, **kwargs)
@@ -99,12 +99,12 @@ def require_privileges(privileges: list) -> Callable[[F], F]:
     return decorator
 
 
-async def deny_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> None:
+async def _deny_access(update: Update, context: ContextTypes.DEFAULT_TYPE, func_name: str) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
         return
-    logger.warning(
+    _logger.warning(
         f"Unauthorized access denied for {effective_user.username} ({effective_user.id}) on function {func_name}",
     )
     await context.bot.send_message(

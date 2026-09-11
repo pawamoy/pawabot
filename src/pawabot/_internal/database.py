@@ -17,14 +17,13 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-Base = declarative_base()
-session = None
+_Base = declarative_base()
+_session = None
 
 
-class User(Base):
+class _User(_Base):
     __tablename__ = "user"
 
     id: int = Column(Integer, primary_key=True)  # ty:ignore[invalid-assignment]
@@ -32,47 +31,47 @@ class User(Base):
     username: str = Column(String(255), unique=True, nullable=False)  # ty:ignore[invalid-assignment]
     is_admin: bool = Column(Boolean, default=False)  # ty:ignore[invalid-assignment]
 
-    privileges = relationship("UserPrivilege", back_populates="user")
+    privileges = relationship("_UserPrivilege", back_populates="user")
 
     def __repr__(self) -> str:
         return f"<User(uid={self.uid}, username='{self.username}', is_admin={self.is_admin})>"
 
     @staticmethod
-    def all() -> list[User]:
-        if session is None:
+    def all() -> list[_User]:
+        if _session is None:
             return []
-        return list(session.query(User))
+        return list(_session.query(_User))
 
     @staticmethod
-    def get(int_or_string: int | str) -> User | None:
+    def get(int_or_string: int | str) -> _User | None:
         if isinstance(int_or_string, int):
-            return User.get_with_id(int_or_string)
+            return _User.get_with_id(int_or_string)
         try:
             uid = int(int_or_string)
         except ValueError:
-            return User.get_with_username(int_or_string)
+            return _User.get_with_username(int_or_string)
         else:
-            return User.get_with_id(uid)
+            return _User.get_with_id(uid)
 
     @staticmethod
-    def get_with_id(uid: int) -> User | None:
-        if session is None:
+    def get_with_id(uid: int) -> _User | None:
+        if _session is None:
             return None
-        return session.query(User).filter(User.uid == uid).first()  # ty:ignore[invalid-argument-type]
+        return _session.query(_User).filter(_User.uid == uid).first()  # ty:ignore[invalid-argument-type]
 
     @staticmethod
-    def get_with_username(username: str) -> User | None:
-        if session is None:
+    def get_with_username(username: str) -> _User | None:
+        if _session is None:
             return None
-        return session.query(User).filter(User.username == username).first()  # ty:ignore[invalid-argument-type]
+        return _session.query(_User).filter(_User.username == username).first()  # ty:ignore[invalid-argument-type]
 
     @staticmethod
-    def create(uid: int, username: str | None = None, *, is_admin: bool = False) -> User:
-        if session is None:
+    def create(uid: int, username: str | None = None, *, is_admin: bool = False) -> _User:
+        if _session is None:
             raise RuntimeError("Database not initialized")
-        user = User(uid=uid, username=username or "?", is_admin=is_admin)
-        session.add(user)
-        session.commit()
+        user = _User(uid=uid, username=username or "?", is_admin=is_admin)
+        _session.add(user)
+        _session.commit()
         return user
 
     def has_privilege(self, privilege: Any) -> bool:
@@ -88,27 +87,27 @@ class User(Base):
         return None
 
     def grant(self, privilege: Any) -> bool:
-        if session is None:
+        if _session is None:
             raise RuntimeError("Database not initialized")
-        session.add(UserPrivilege(user_id=self.uid, privilege=privilege.name))
-        session.commit()
+        _session.add(_UserPrivilege(user_id=self.uid, privilege=privilege.name))
+        _session.commit()
         return True
 
     def revoke(self, privilege: Any) -> bool:
-        if session is None:
+        if _session is None:
             raise RuntimeError("Database not initialized")
-        session.delete(self.get_privilege(privilege))
-        session.commit()
+        _session.delete(self.get_privilege(privilege))
+        _session.commit()
         return True
 
 
-def save() -> None:
-    if session is None:
+def _save() -> None:
+    if _session is None:
         raise RuntimeError("Database not initialized")
-    session.commit()
+    _session.commit()
 
 
-class UserPrivilege(Base):
+class _UserPrivilege(_Base):
     __tablename__ = "privilege"
     __table_args__ = (UniqueConstraint("user_id", "privilege"), {"extend_existing": True})
 
@@ -116,22 +115,22 @@ class UserPrivilege(Base):
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     privilege = Column(String(255), nullable=False)
 
-    user = relationship("User", back_populates="privileges")
+    user = relationship("_User", back_populates="privileges")
 
     def __repr__(self) -> str:
         return rf"<UserPrivilege(user={self.user!r}, privilege='{self.privilege}')\>"
 
 
-def init(db_path: str = "sqlite:///db.sqlite3") -> Any:
-    global session  # noqa: PLW0603
+def _init(db_path: str = "sqlite:///db.sqlite3") -> Any:
+    global _session  # noqa: PLW0603
 
     # connection
     engine = create_engine(db_path)
 
     # create metadata
-    Base.metadata.create_all(engine)
+    _Base.metadata.create_all(engine)
 
     # create session
-    session = sessionmaker(bind=engine)()
+    _session = sessionmaker(bind=engine)()
 
-    return session
+    return _session

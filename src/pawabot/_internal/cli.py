@@ -41,10 +41,10 @@ from telegram.ext import (
 )
 
 from pawabot._internal import callbacks
-from pawabot._internal.database import User, init
-from pawabot._internal.utils import get_data_dir
+from pawabot._internal.database import _init, _User
+from pawabot._internal.utils import _get_data_dir
 
-DATA_DIR = get_data_dir()
+_DATA_DIR = _get_data_dir()
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -139,7 +139,7 @@ def main(cmd_args: list[str] | None = None) -> int:
     )
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
-    init(db_path="sqlite:///" + str(DATA_DIR / "db.sqlite3"))
+    _init(db_path="sqlite:///" + str(_DATA_DIR / "db.sqlite3"))
 
     if args.subcommand is None:
         print(parser.format_help(), file=sys.stderr)
@@ -152,18 +152,18 @@ def main(cmd_args: list[str] | None = None) -> int:
         if args.uid is None or args.username is None:
             print("Error: --uid and --username are required", file=sys.stderr)
             return 1
-        User.create(uid=args.uid, username=args.username, is_admin=True)
+        _User.create(uid=args.uid, username=args.username, is_admin=True)
         return 0
     if args.subcommand == "create-user":
         if args.uid is None or args.username is None:
             print("Error: --uid and --username are required", file=sys.stderr)
             return 1
-        User.create(uid=args.uid, username=args.username, is_admin=args.admin)
+        _User.create(uid=args.uid, username=args.username, is_admin=args.admin)
         return 0
     if args.subcommand == "list-users":
         print(f"{'ID':>10}  {'USERNAME':<20}  ADMIN")
         print("---------------------------------------")
-        for user in User.all():
+        for user in _User.all():
             print(f"{user.uid:>10}  {user.username:<20}  {user.is_admin}")
             # TODO: also show privileges
         return 0
@@ -183,43 +183,36 @@ def main(cmd_args: list[str] | None = None) -> int:
 
         app = ApplicationBuilder().token(bot_token).build()
 
-        app.add_handler(CommandHandler("start", callbacks.start))
-        app.add_handler(CommandHandler("help", callbacks.help))
-        app.add_handler(CommandHandler("myID", callbacks.my_id))
-        app.add_handler(CommandHandler("myPrivileges", callbacks.my_privileges))
-        app.add_handler(CommandHandler("requestAccess", callbacks.request_access))
-        app.add_handler(CommandHandler("grant", callbacks.grant))  # ty:ignore[invalid-argument-type]
-        app.add_handler(CommandHandler("revoke", callbacks.revoke))  # ty:ignore[invalid-argument-type]
+        app.add_handler(CommandHandler("start", callbacks._start))
+        app.add_handler(CommandHandler("help", callbacks._help))
+        app.add_handler(CommandHandler("myID", callbacks._my_id))
+        app.add_handler(CommandHandler("myPrivileges", callbacks._my_privileges))
+        app.add_handler(CommandHandler("requestAccess", callbacks._request_access))
+        app.add_handler(CommandHandler("grant", callbacks._grant))
+        app.add_handler(CommandHandler("revoke", callbacks._revoke))
 
-        handler_search = CommandHandler("search", callbacks.search)
-        handler_search_pattern = MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks.search_pattern)
-        handler_search_select = MessageHandler(
-            filters.Regex(r"^([1-9][0-9]*\+?|Cancel)$"),
-            callbacks.search_select,
+        # Interactive movie search: choose a movie, then a torrent.
+        search_conversation = ConversationHandler(
+            entry_points=[CommandHandler("search", callbacks._search)],
+            allow_reentry=True,
+            states={
+                callbacks._SELECTING_RESULT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks._select_search_result),
+                ],
+                callbacks._SELECTING_TORRENT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks._select_torrent),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", callbacks._cancel)],
         )
+        app.add_handler(search_conversation)
 
-        app.add_handler(
-            ConversationHandler(
-                entry_points=[handler_search],  # ty:ignore
-                states={  # ty:ignore
-                    callbacks.STATE.SEARCH.PATTERN: [handler_search_pattern],
-                    callbacks.STATE.SEARCH.SELECT: [handler_search_select],
-                },
-                fallbacks=[CommandHandler("cancel", callbacks.cancel)],
-            ),
-        )
+        app.add_handler(MessageHandler(filters.Regex(callbacks._MAGNET_RE), callbacks._parse_magnet))
 
-        # Duplicate search handler outside conversation to allow /search at any time.
-        app.add_handler(handler_search)
+        app.add_handler(CommandHandler("test", callbacks._test))
 
-        # app.add_handler(InlineQueryHandler(callbacks.inline_search))
-
-        app.add_handler(MessageHandler(filters.Regex(callbacks.MAGNET_RE), callbacks.parse_magnet))
-
-        app.add_handler(CommandHandler("test", callbacks.test))
-
-        app.add_handler(MessageHandler(filters.COMMAND, callbacks.unknown_command))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks.unknown))
+        app.add_handler(MessageHandler(filters.COMMAND, callbacks._unknown_command))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, callbacks._unknown))
 
         logger.info("Starting Bot")
         app.run_polling()

@@ -30,13 +30,11 @@ classifiers = [
 ]
 dependencies = [
     "aria2p>=0.9.1",
-    "beautifulsoup4>=4.9.1",
     "httpx2>=0.1.0",
     "loguru>=0.5.2",
     "platformdirs>=4.0.0",
     "python-telegram-bot>=22.0",
     "sqlalchemy>=1.3.19",
-    "tomlkit>=0.7.0",
 ]
 
 [project.urls]
