@@ -14,32 +14,39 @@
 
 from __future__ import annotations
 
+import asyncio
 import random
 import re
 from textwrap import dedent
+from typing import TYPE_CHECKING, Any
 
 import aria2p
 from loguru import logger
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.constants import ChatAction, ParseMode
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.constants import ParseMode
+from telegram.ext import ConversationHandler
 
-from pawabot._internal.database import User
+from pawabot._internal.database import _User
 from pawabot._internal.decorators import (
-    require_access,
-    require_admin,
-    require_privileges,
+    _require_access,
+    _require_admin,
+    _require_privileges,
 )
-from pawabot._internal.privileges import Privileges
-from pawabot._internal.torrents import TPB, Search
+from pawabot._internal.privileges import _Privileges
+from pawabot._internal.search import _ProviderError, _resolve_imdb_id, _search_movies, _search_torrents
+
+if TYPE_CHECKING:
+    from telegram import Update
+    from telegram.ext import ContextTypes
+
+    from pawabot._internal.search.models import _Movie, _MovieTorrent
+
+# Conversation state is scoped to both the Telegram user and chat.
+_SELECTING_RESULT, _SELECTING_TORRENT = range(2)
+_SEARCH_PAGE_SIZE = 10
 
 
-class STATE:
-    class SEARCH:
-        PATTERN, SELECT = range(2)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def _start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
@@ -47,7 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_user = effective_user
     logger.info(f"{tg_user.username} ({tg_user.id}) called /start")
 
-    db_user = User.get_with_id(tg_user.id)
+    db_user = _User.get_with_id(tg_user.id)
 
     if not db_user:
         text = dedent(
@@ -75,8 +82,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_message(chat_id=effective_chat.id, text=text)
 
 
-@require_access
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_access
+async def _help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
@@ -90,7 +97,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         /requestAccess - To request access to my commands.
         /myID - To show your Telegram ID.
         /myPrivileges - To show your current permissions.
-        /search - To search on The Pirate Bay.
+        /search - To search for movies and their torrents.
         /grant - To grant a permission to a user.
         /revoke - To revoke a permission to a user.
     """,
@@ -99,8 +106,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_message(chat_id=effective_chat.id, text=text, parse_mode=ParseMode.MARKDOWN)
 
 
-@require_access
-async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_access
+async def _my_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
@@ -110,15 +117,15 @@ async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_message(chat_id=effective_chat.id, text=str(user.id))
 
 
-@require_privileges([])
-async def my_privileges(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_privileges([])
+async def _my_privileges(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
         return
     user = effective_user
     logger.info(f"{user.username} ({user.id}) called /myPrivileges")
-    db_user = User.get_with_id(user.id)
+    db_user = _User.get_with_id(user.id)
 
     text = []
     if db_user:
@@ -135,7 +142,7 @@ async def my_privileges(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await context.bot.send_message(chat_id=effective_chat.id, text="".join(text))
 
 
-async def request_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def _request_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
@@ -143,10 +150,10 @@ async def request_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     tg_user = effective_user
     logger.info(f"{tg_user.username} ({tg_user.id}) called /requestAccess")
 
-    user = User.get_with_id(tg_user.id)
+    user = _User.get_with_id(tg_user.id)
 
     if not user:
-        User.create(tg_user.id, tg_user.username)
+        _User.create(tg_user.id, tg_user.username)
         await context.bot.send_message(
             chat_id=effective_chat.id,
             text="I received your request. Please wait for feedback.",
@@ -158,8 +165,8 @@ async def request_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
-@require_admin
-async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_admin
+async def _grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
@@ -175,7 +182,7 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     permission = context.args[1]
-    user = User.get(context.args[0])
+    user = _User.get(context.args[0])
 
     if not user:
         try:
@@ -187,7 +194,7 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
         else:
-            user = User.create(uid)
+            user = _User.create(uid)
 
     if user.has_perm(permission):
         await context.bot.send_message(
@@ -212,8 +219,8 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-@require_admin
-async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_admin
+async def _revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     if effective_user is None or effective_chat is None:
@@ -226,7 +233,7 @@ async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     permission = context.args[1]
-    user = User.get(context.args[0])
+    user = _User.get(context.args[0])
 
     if not user:
         try:
@@ -238,7 +245,7 @@ async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
         else:
-            user = User.create(uid)
+            user = _User.create(uid)
 
     if not user.has_perm(permission):
         await context.bot.send_message(
@@ -263,215 +270,213 @@ async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-@require_privileges([Privileges.DOWNLOADER])
-async def search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int | None:
-    effective_user = update.effective_user
-    effective_chat = update.effective_chat
-    if effective_user is None or effective_chat is None:
+def _search_data(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> dict[str, Any]:
+    if context.user_data is None:
+        return {}
+    return context.user_data.setdefault("search_sessions", {}).setdefault(chat_id, {})
+
+
+def _clear_search(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if context.user_data is not None:
+        context.user_data.get("search_sessions", {}).pop(chat_id, None)
+
+
+def _selection(text: str, count: int) -> int | None:
+    if not re.fullmatch(r"[0-9]{1,3}", text):
         return None
-    user = effective_user
-    logger.info(f"{user.username} ({user.id}) called /search with args={context.args}")
-
-    await context.bot.send_chat_action(chat_id=effective_chat.id, action=ChatAction.TYPING)
-
-    if not context.args:
-        await context.bot.send_message(chat_id=effective_chat.id, text="What do you want to search?")
-        return STATE.SEARCH.PATTERN
-
-    pattern = " ".join(context.args)
-    s = TPB.search(user.id, pattern)
-
-    if not s.results:
-        await context.bot.send_message(chat_id=effective_chat.id, text="No results")
-        return ConversationHandler.END
-
-    s.save()
-    await reply_torrents(update, context, s.results)
-
-    return STATE.SEARCH.SELECT
+    number = int(text)
+    return number - 1 if 1 <= number <= count else None
 
 
-async def search_pattern(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    effective_user = update.effective_user
-    effective_chat = update.effective_chat
-    effective_message = update.effective_message
-    if effective_user is None or effective_chat is None or effective_message is None:
-        return STATE.SEARCH.PATTERN
-    user = effective_user
-    pattern = effective_message.text
-    if pattern is None:
-        return STATE.SEARCH.PATTERN
-    logger.info(f"{user.username} ({user.id}) sent pattern '{pattern}' during /search conversation")
-    await context.bot.send_chat_action(chat_id=effective_chat.id, action=ChatAction.TYPING)
-
-    logger.info(f"Searching '{pattern}' on TPB proxies")
-    try:
-        s = TPB.search(user.id, pattern)
-    except LookupError:
-        logger.info(f"No results for '{pattern}' on TPB proxies")
-        await context.bot.send_message(chat_id=effective_chat.id, text="No results")
-        return ConversationHandler.END
-
-    logger.info(f"Saving results for '{pattern}'")
-    s.save()
-    await reply_torrents(update, context, s.results)
-
-    return STATE.SEARCH.SELECT
-
-
-async def search_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    effective_user = update.effective_user
-    effective_chat = update.effective_chat
-    effective_message = update.effective_message
-    if effective_user is None or effective_chat is None or effective_message is None:
-        return ConversationHandler.END
-    user = effective_user
-    message_text = effective_message.text
-    if message_text is None:
-        return ConversationHandler.END
-
-    if message_text == "Cancel":
-        logger.info(f"{user.username} ({user.id}) canceled /search conversation")
-        return ConversationHandler.END
-
-    await context.bot.send_chat_action(chat_id=effective_chat.id, action=ChatAction.TYPING)
-
-    s = Search.load(user.id)
-
-    if message_text.endswith("+"):
-        last = int(message_text[:-1])
-        page = last // 10
-        logger.info(f"{user.username} ({user.id}) asked to see page {page + 1} during /search conversation")
-
-        if last >= len(s.results):
-            s.update(TPB.search(s.user_id, s.pattern, s.pages[-1] + 1))
-
-        await reply_torrents(update, context, s.results, page=page + 1)
-        return STATE.SEARCH.SELECT
-
-    torrent = s.results[int(message_text) - 1]
-    logger.info(f"{user.username} ({user.id}) chose torrent '{torrent.title}' during /search conversation")
-
-    db_user = User.get_with_id(user.id)
-    if db_user is None:
-        return ConversationHandler.END
-    if db_user.is_admin or db_user.has_perm("can_auto_download"):
-        api = aria2p.API()
-        download = api.add_magnet(torrent.magnet)
-        reply = f"The new download is *{download.name}* (gid: {download.gid}, status: {download.status})"
-        logger.info(f"torrent '{download.name}' (gid: {download.gid}) was added to aria2")
-    else:
-        reply = (
-            "A download request has been sent to an administrator. You will get a notification when they processed it."
-        )
-
-    await context.bot.send_message(
-        chat_id=effective_chat.id,
-        text=reply,
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode=ParseMode.MARKDOWN,
+def _selection_keyboard(count: int) -> ReplyKeyboardMarkup:
+    numbers = [str(i) for i in range(1, count + 1)]
+    return ReplyKeyboardMarkup(
+        [numbers[i : i + 5] for i in range(0, count, 5)] + [["/cancel"]],
+        one_time_keyboard=True,
+        resize_keyboard=True,
     )
 
+
+@_require_privileges([_Privileges.DOWNLOADER])
+async def _search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Find a movie by title or IMDb ID, then choose a torrent."""
+    if update.effective_chat is None:
+        return ConversationHandler.END
+    chat_id = update.effective_chat.id
+    _clear_search(chat_id, context)
+    query = " ".join(context.args or []).strip()
+    if not query:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Usage: /search <movie name> or /search tt1254207",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return ConversationHandler.END
+    if re.fullmatch(r"tt[0-9]+", query):
+        return await _search_by_imdb_id(chat_id, context, query)
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"Searching movies for '{query[:200]}'...",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    try:
+        movies = await _search_movies(query)
+    except _ProviderError as error:
+        await context.bot.send_message(chat_id=chat_id, text=str(error))
+        return ConversationHandler.END
+    if not movies:
+        await context.bot.send_message(chat_id=chat_id, text="No movies found. Try a different title or an IMDb ID.")
+        return ConversationHandler.END
+    _search_data(chat_id, context)["movies"] = movies
+    await _display_search_results(chat_id, context, movies)
+    return _SELECTING_RESULT
+
+
+async def _search_by_imdb_id(chat_id: int, context: ContextTypes.DEFAULT_TYPE, imdb_id: str) -> int:
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Searching torrents...",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    try:
+        torrents = await _search_torrents(imdb_id)
+    except _ProviderError as error:
+        _clear_search(chat_id, context)
+        await context.bot.send_message(chat_id=chat_id, text=str(error))
+        return ConversationHandler.END
+    if not torrents:
+        _clear_search(chat_id, context)
+        await context.bot.send_message(chat_id=chat_id, text="No torrents found for this movie.")
+        return ConversationHandler.END
+    session = _search_data(chat_id, context)
+    session.clear()
+    session.update(torrents=torrents, page=0)
+    await _display_streams(chat_id, context)
+    return _SELECTING_TORRENT
+
+
+async def _display_search_results(chat_id: int, context: ContextTypes.DEFAULT_TYPE, movies: list[_Movie]) -> None:
+    lines = [f"{i}. {movie.title[:160]} ({movie.year})" for i, movie in enumerate(movies, 1)]
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Movies:\n\n" + "\n".join(lines) + "\n\nChoose a movie by number, or /cancel.",
+        reply_markup=_selection_keyboard(len(movies)),
+    )
+
+
+@_require_privileges([_Privileges.DOWNLOADER])
+async def _select_search_result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Resolve the selected movie and fetch its torrents."""
+    if update.effective_chat is None or update.effective_message is None:
+        return ConversationHandler.END
+    chat_id = update.effective_chat.id
+    movies = _search_data(chat_id, context).get("movies", [])
+    if not movies:
+        return await _cancel(update, context)
+    index = _selection((update.effective_message.text or "").strip(), len(movies))
+    if index is None:
+        await context.bot.send_message(chat_id=chat_id, text=f"Choose a number from 1 to {len(movies)}, or /cancel.")
+        return _SELECTING_RESULT
+    try:
+        imdb_id = await _resolve_imdb_id(movies[index])
+    except _ProviderError as error:
+        await context.bot.send_message(chat_id=chat_id, text=f"{error} Choose again or /cancel.")
+        return _SELECTING_RESULT
+    if not imdb_id:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="This movie has no IMDb ID. Choose another movie or /cancel.",
+        )
+        return _SELECTING_RESULT
+    return await _search_by_imdb_id(chat_id, context, imdb_id)
+
+
+async def _display_streams(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    session = _search_data(chat_id, context)
+    torrents = session["torrents"]
+    start = session["page"] * _SEARCH_PAGE_SIZE
+    page = torrents[start : start + _SEARCH_PAGE_SIZE]
+    lines = []
+    for i, torrent in enumerate(page, 1):
+        seeders = torrent.seeders if torrent.seeders is not None else "Unknown"
+        lines.append(
+            f"{i}. {torrent.title[:160]}\n   {torrent.quality[:50]} | Seeders: {seeders} | Size: {torrent.size}",
+        )
+    numbers = [str(i) for i in range(1, len(page) + 1)]
+    buttons = [numbers[i : i + 5] for i in range(0, len(numbers), 5)]
+    navigation = []
+    if start:
+        navigation.append("Previous")
+    if start + len(page) < len(torrents):
+        navigation.append("Next")
+    buttons.append([*navigation, "/cancel"])
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"Torrents {start + 1}-{start + len(page)} of {len(torrents)}:\n\n"
+        + "\n\n".join(lines)
+        + "\n\nChoose a torrent number to download, or /cancel.",
+        reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True),
+    )
+
+
+def _add_movie_torrent(torrent: _MovieTorrent) -> str:
+    # Run the synchronous RPC calls in a worker; keep database access on the event loop.
+    # Stremio file indices start at zero; aria2's select-file option starts at one.
+    options = {} if torrent.file_index is None else {"select-file": str(torrent.file_index + 1)}
+    download = aria2p.API().add_magnet(torrent.magnet, options=options)
+    return f"Download added: {torrent.filename or torrent.title}\nGID: {download.gid} | Status: {download.status}"
+
+
+@_require_privileges([_Privileges.DOWNLOADER])
+async def _select_torrent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Download the selected torrent while retaining its file selection."""
+    if update.effective_chat is None or update.effective_message is None or update.effective_user is None:
+        return ConversationHandler.END
+    chat_id = update.effective_chat.id
+    session = _search_data(chat_id, context)
+    torrents = session.get("torrents", [])
+    if not torrents:
+        return await _cancel(update, context)
+    text = (update.effective_message.text or "").strip()
+    page = session["page"]
+    if text in {"Next", "Previous"}:
+        page += 1 if text == "Next" else -1
+        if 0 <= page * _SEARCH_PAGE_SIZE < len(torrents):
+            session["page"] = page
+        await _display_streams(chat_id, context)
+        return _SELECTING_TORRENT
+    start = page * _SEARCH_PAGE_SIZE
+    index = _selection(text, min(_SEARCH_PAGE_SIZE, len(torrents) - start))
+    if index is None:
+        await context.bot.send_message(chat_id=chat_id, text="Choose one of the torrent numbers, or /cancel.")
+        return _SELECTING_TORRENT
+    db_user = _User.get_with_id(update.effective_user.id)
+    if db_user is None:
+        return await _cancel(update, context)
+    if not (db_user.is_admin or db_user.has_privilege(_Privileges.VERIFIED_DOWNLOADER)):
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Starting downloads requires the Verified Downloader privilege. Ask an administrator for access.",
+        )
+        return _SELECTING_TORRENT
+    try:
+        reply = await asyncio.to_thread(_add_movie_torrent, torrents[start + index])
+    except (aria2p.ClientException, OSError):
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Could not confirm the download with aria2. Check its queue before trying again, or /cancel.",
+        )
+        return _SELECTING_TORRENT
+    _clear_search(chat_id, context)
+    await context.bot.send_message(chat_id=chat_id, text=reply, reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
-async def reply_torrents(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    torrents: list | None = None,
-    page: int = 1,
-) -> None:
-    effective_chat = update.effective_chat
-    if effective_chat is None:
-        return
-    if torrents is None:
-        torrents = []
-    x = (page - 1) * 10
-    y = x + 10
-
-    reply_text = []
-    keyboard_buttons = [[], []]
-
-    for i, torrent in enumerate(torrents[x:y], 1):
-        keyboard_buttons[0 if i <= 5 else 1].append(str(i + x))  # noqa: PLR2004
-        reply_text.append(
-            f"*#{i + x} - {torrent.title}*\n  {torrent.seeders}/{torrent.leechers}  {torrent.size}  {torrent.date}\n\n",
-        )
-
-    third_row = ["Cancel"]
-    last = keyboard_buttons[1][-1] if keyboard_buttons[1] else keyboard_buttons[0][-1]
-    if len(torrents) > y or len(torrents) % 30 == 0:
-        third_row.insert(0, last + "+")
-
-    keyboard_buttons.append(third_row)
-
-    await context.bot.send_message(
-        chat_id=effective_chat.id,
-        text="".join(reply_text),
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=ReplyKeyboardMarkup(keyboard_buttons, one_time_keyboard=True, resize_keyboard=True),
-    )
+_MAGNET_RE = r"\bmagnet:\?xt=urn:btih:(?:[a-fA-F0-9]{40}|[A-Za-z2-7]{32})(?=&|\s|$)(?:&[^\s<>]+)*"
 
 
-# @require_privileges([Privileges.DOWNLOADER])
-# def inline_search(update, context):
-#     query = update.inline_query.query
-#     user = update.inline_query.from_user
-#     logger.info(f"{user.username} ({user.id}) called inline search with {query}")
-#
-#     if not query:
-#         logger.info("inline search: query is empty, aborting")
-#         return
-#
-#     output = None
-#     retries = 2
-#
-#     while not output and retries > 0:
-#         logger.info(f"running pirate-bay-search")
-#         try:
-#             output = (
-#                 subprocess.check_output(["pirate-bay-search", query], timeout=5).decode(encoding="utf-8").rstrip("\n")
-#             )
-#         except subprocess.TimeoutExpired:
-#             retries -= 1
-#             logger.warn(f"pirate-bay-search timeout, retries left: {retries}")
-#
-#     if retries == 0:
-#         context.bot.answer_inline_query(
-#             update.inline_query.id,
-#             [
-#                 InlineQueryResultArticle(
-#                     id=query,
-#                     title="Connection timeout",
-#                     input_message_content=InputTextMessageContent("Connection timeout"),
-#                 )
-#             ],
-#         )
-#         return
-#
-#     logger.debug("pirate-bay-search results:\n\n" + output)
-#
-#     results = []
-#     for i, torrent in enumerate(output.split("\n\n")):
-#         lines = torrent.split("\n")
-#         results.append(
-#             InlineQueryResultArticle(
-#                 id=query + str(i),
-#                 title=lines[0].replace(".", " "),
-#                 description=lines[1],
-#                 input_message_content=InputTextMessageContent(torrent),
-#                 hide_url=True,
-#             )
-#         )
-#
-#     context.bot.answer_inline_query(update.inline_query.id, results)
-
-
-MAGNET_RE = r"\bmagnet:\?xt=urn:[A-Za-z0-9]+:[A-Za-z0-9]{32,40}(?:&(?:amp;)?dn=.+)?(?:&(?:amp;)?tr=.+)+\b"
-
-
-@require_privileges([Privileges.DOWNLOADER])
-async def parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_privileges([_Privileges.DOWNLOADER])
+async def _parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     effective_message = update.effective_message
@@ -480,40 +485,41 @@ async def parse_magnet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     tg_user = effective_user
     logger.info(f"{tg_user.username} ({tg_user.id}) sent magnet(s)")
 
-    db_user = User.get_with_id(tg_user.id)
+    db_user = _User.get_with_id(tg_user.id)
     if db_user is None:
         return
 
-    magnets = re.findall(MAGNET_RE, effective_message.text or "")
+    magnets = re.findall(_MAGNET_RE, effective_message.text or "")
 
     reply = "I got your magnet, thanks.\n" if len(magnets) == 1 else f"I got your {len(magnets)} magnets, thanks.\n"
 
-    if db_user.is_admin or db_user.has_perm("can_auto_download"):
+    if db_user.is_admin or db_user.has_privilege(_Privileges.VERIFIED_DOWNLOADER):
         api = aria2p.API()
-        downloads = [api.add_magnet(magnet) for magnet in magnets]
+        downloads = [await asyncio.to_thread(api.add_magnet, magnet) for magnet in magnets]
         reply += "The new downloads are: \n\n"
         for d in downloads:
             reply += f"*{d.name}* (gid: {d.gid}, status: {d.status})\n\n"
     else:
-        reply += (
-            "You must now wait for the administrator to accept them.\nYou will receive a notification when it's done!"
-        )
+        reply += "Starting downloads requires the Verified Downloader privilege. Ask an administrator for access."
 
     await context.bot.send_message(chat_id=effective_chat.id, text=reply, parse_mode=ParseMode.MARKDOWN)
 
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:  # noqa: ARG001
+async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     effective_user = update.effective_user
     effective_message = update.effective_message
     if effective_user is None or effective_message is None:
-        return
+        return ConversationHandler.END
+    if update.effective_chat is not None:
+        _clear_search(update.effective_chat.id, context)
     user = effective_user
-    logger.info("User %s canceled the conversation.", user.first_name)
-    await effective_message.reply_text("Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove())
+    logger.info("User {} canceled the conversation.", user.first_name)
+    await effective_message.reply_text("Search canceled.", reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
 
 
-@require_privileges([Privileges.TESTER])
-async def test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_privileges([_Privileges.TESTER])
+async def _test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_chat = update.effective_chat
     if effective_chat is None:
         return
@@ -524,8 +530,8 @@ async def test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-@require_access
-async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_access
+async def _unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     effective_message = update.effective_message
@@ -539,8 +545,8 @@ async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
 
-@require_access
-async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@_require_access
+async def _unknown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     effective_user = update.effective_user
     effective_chat = update.effective_chat
     effective_message = update.effective_message
