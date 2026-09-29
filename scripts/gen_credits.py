@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: ISC
+#
+# ISC License
+#
 # Copyright (c) 2020, Timothée Mazzucotelli and contributors
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -67,7 +71,7 @@ def _extra_marker(req: Requirement) -> str | None:
     if not req.marker:
         return None
     try:
-        return next(marker[2].value for marker in req.marker._markers if getattr(marker[0], "value", None) == "extra")
+        return next(marker[2].value for marker in req.marker._markers if getattr(marker[0], "value", None) == "extra")  # ty:ignore[unresolved-attribute]
     except StopIteration:
         return None
 

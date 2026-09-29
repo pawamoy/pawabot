@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: ISC
+#
+# ISC License
+#
 # Copyright (c) 2020, Timothée Mazzucotelli and contributors
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -12,7 +16,9 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-"""Tests for the `cli` module."""
+"""Tests for the CLI."""
+
+from __future__ import annotations
 
 import pytest
 
