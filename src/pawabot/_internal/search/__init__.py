@@ -39,7 +39,7 @@ async def _search_movies(query: str) -> list[_Movie]:
     for provider in providers:
         try:
             movies = await provider(query)
-        except _ProviderError as error:  # noqa: PERF203 - each provider must be able to fail independently
+        except _ProviderError as error:
             errors.append(str(error))
         else:
             if movies:
